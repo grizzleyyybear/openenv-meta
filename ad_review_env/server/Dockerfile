@@ -11,6 +11,7 @@ COPY __init__.py .
 COPY models.py .
 COPY data.py .
 COPY grader.py .
+COPY agent.py .
 COPY client.py .
 COPY server/ ./server/
 COPY README.md .

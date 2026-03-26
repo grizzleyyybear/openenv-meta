@@ -1,0 +1,93 @@
+"""Tests for data.py — dataset integrity and structure."""
+
+from data import CONTENT_ITEMS, CONTENT_INDEX
+from models import IAB_CATEGORIES, GARM_CATEGORIES
+
+
+def test_dataset_has_30_items():
+    assert len(CONTENT_ITEMS) == 30
+
+
+def test_difficulty_distribution():
+    by_diff = {}
+    for item in CONTENT_ITEMS:
+        by_diff.setdefault(item["difficulty"], []).append(item)
+    assert len(by_diff["easy"]) == 10
+    assert len(by_diff["medium"]) == 10
+    assert len(by_diff["hard"]) == 10
+
+
+def test_content_ids_are_unique():
+    ids = [item["content_id"] for item in CONTENT_ITEMS]
+    assert len(ids) == len(set(ids))
+
+
+def test_content_index_matches():
+    assert len(CONTENT_INDEX) == 30
+    for item in CONTENT_ITEMS:
+        assert item["content_id"] in CONTENT_INDEX
+        assert CONTENT_INDEX[item["content_id"]] is item
+
+
+def test_required_fields_present():
+    required = [
+        "content_id", "content_text", "content_type", "platform",
+        "difficulty", "gold_decision", "gold_iab_category", "gold_garm_category",
+        "gold_risk_level",
+    ]
+    for item in CONTENT_ITEMS:
+        for field in required:
+            assert field in item, f"Missing {field} in {item['content_id']}"
+
+
+def test_gold_decisions_valid():
+    valid = {"APPROVE", "REJECT", "ESCALATE"}
+    for item in CONTENT_ITEMS:
+        assert item["gold_decision"] in valid, (
+            f"{item['content_id']}: invalid gold_decision '{item['gold_decision']}'"
+        )
+
+
+def test_gold_iab_categories_valid():
+    for item in CONTENT_ITEMS:
+        assert item["gold_iab_category"] in IAB_CATEGORIES, (
+            f"{item['content_id']}: invalid gold_iab_category '{item['gold_iab_category']}'"
+        )
+
+
+def test_gold_garm_categories_valid():
+    for item in CONTENT_ITEMS:
+        assert item["gold_garm_category"] in GARM_CATEGORIES, (
+            f"{item['content_id']}: invalid gold_garm_category '{item['gold_garm_category']}'"
+        )
+
+
+def test_gold_risk_levels_valid():
+    valid = {"LOW", "MEDIUM", "HIGH", "CRITICAL"}
+    for item in CONTENT_ITEMS:
+        assert item["gold_risk_level"] in valid, (
+            f"{item['content_id']}: invalid gold_risk_level '{item['gold_risk_level']}'"
+        )
+
+
+def test_platforms_valid():
+    valid = {"instagram", "twitter", "youtube", "tiktok", "facebook"}
+    for item in CONTENT_ITEMS:
+        assert item["platform"] in valid, (
+            f"{item['content_id']}: unexpected platform '{item['platform']}'"
+        )
+
+
+def test_content_types_valid():
+    valid = {"post", "comment", "caption", "bio"}
+    for item in CONTENT_ITEMS:
+        assert item["content_type"] in valid, (
+            f"{item['content_id']}: unexpected content_type '{item['content_type']}'"
+        )
+
+
+def test_content_text_not_empty():
+    for item in CONTENT_ITEMS:
+        assert len(item["content_text"].strip()) > 0, (
+            f"{item['content_id']}: empty content_text"
+        )

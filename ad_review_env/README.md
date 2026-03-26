@@ -96,6 +96,8 @@ with AdReviewEnv(base_url="http://localhost:8000") as env:
 | `/tasks` | GET | Sample tasks for evaluation |
 | `/grader` | POST | Standalone grader endpoint |
 | `/baseline` | GET | Baseline agent demonstration |
+| `/evaluate` | GET | Batch evaluation (smart or baseline agent) |
+| `/web` | GET | Interactive web dashboard |
 | `/docs` | GET | Interactive API documentation |
 
 ## Running Locally
@@ -109,11 +111,38 @@ uvicorn server.app:app --reload --port 8000
 ## Baseline Performance
 
 The keyword-based baseline agent scores approximately **0.45–0.55** overall.
+
+The smart contextual agent scores **~0.996** (30/30 correct decisions).
+
 A well-tuned LLM agent should target **> 0.75**.
 
 ```bash
 python baseline.py
 ```
+
+## Smart Agent
+
+The smart agent (`agent.py`) uses multi-signal contextual analysis instead of flat keyword matching:
+
+- **Per-category pattern libraries** with weighted signals (IAB + GARM categories)
+- **Context modifiers** — satire detection, personal narrative, advocacy recognition
+- **Calibrated confidence** — adjusts based on signal clarity
+- **Rich reasoning** — generates detailed explanations with specific flagged elements
+
+```bash
+# Run batch evaluation via API
+curl http://localhost:8000/evaluate?agent=smart
+curl http://localhost:8000/evaluate?agent=baseline
+```
+
+## Tests
+
+```bash
+cd ad_review_env
+python -m pytest tests/ -v
+```
+
+70 tests covering data integrity, grader logic, smart agent decisions, and model validation.
 
 ## Project Structure
 
@@ -123,12 +152,19 @@ ad_review_env/
 ├── models.py            # AdReviewAction + AdReviewObservation (Pydantic)
 ├── data.py              # 30 curated UGC items with gold labels
 ├── grader.py            # Deterministic reward grader
+├── agent.py             # Smart contextual review agent (~0.996 score)
 ├── client.py            # AdReviewEnv WebSocket client
 ├── baseline.py          # Keyword-based baseline agent
 ├── openenv.yaml         # OpenEnv manifest
 ├── pyproject.toml       # Project metadata
-└── server/
-    ├── environment.py   # Core RL environment logic
-    ├── app.py           # FastAPI app + hackathon endpoints
-    └── Dockerfile       # Container image
+├── server/
+│   ├── environment.py   # Core RL environment logic
+│   ├── app.py           # FastAPI app + hackathon endpoints + web dashboard
+│   └── Dockerfile       # Container image
+└── tests/
+    ├── conftest.py      # Test configuration + openenv stubs
+    ├── test_data.py     # Dataset integrity tests
+    ├── test_grader.py   # Grader scoring logic tests
+    ├── test_agent.py    # Smart agent correctness tests
+    └── test_models.py   # Pydantic model validation tests
 ```
