@@ -1,26 +1,8 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
-#
-# This source code is licensed under the BSD-style license found in the
-# LICENSE file in the root directory of this source tree.
-
 """
-FastAPI application for the Brand-Safe Ad Review Environment.
+FastAPI application for the Brand-Safe Ad Review environment.
 
-Auto-generated endpoints (via create_app):
-    POST /reset       — start a new review episode
-    POST /step        — submit a review decision
-    GET  /state       — current episode state
-    GET  /schema      — action/observation JSON schemas
-    GET  /health      — health check
-    WS   /ws          — WebSocket for persistent sessions
-
-Hackathon endpoints:
-    GET  /tasks       — sample tasks for evaluation
-    POST /grader      — standalone grader endpoint
-    GET  /baseline    — baseline agent demonstration
-    GET  /evaluate    — batch evaluation (smart or baseline)
-    GET  /web         — interactive dashboard
+Auto-generated: POST /reset, POST /step, GET /state, GET /schema, GET /health, WS /ws
+Hackathon:      GET /tasks, POST /grader, GET /baseline, GET /evaluate, GET /web
 """
 
 import os
@@ -34,7 +16,7 @@ from pydantic import BaseModel, Field
 
 try:
     from openenv.core.env_server.http_server import create_app
-except Exception as e:  # pragma: no cover
+except Exception as e:
     raise ImportError("openenv is required. Install with: uv sync") from e
 
 try:
@@ -51,27 +33,15 @@ except ImportError:
     from server.environment import AdReviewEnvironment
 
 
-# ---------------------------------------------------------------------------
-# Core app — auto-generates /reset /step /state /schema /health /ws /docs
-# ---------------------------------------------------------------------------
-
 app = create_app(
-    AdReviewEnvironment,
-    AdReviewAction,
-    AdReviewObservation,
-    env_name="ad_review_env",
-    max_concurrent_envs=4,
+    AdReviewEnvironment, AdReviewAction, AdReviewObservation,
+    env_name="ad_review_env", max_concurrent_envs=4,
 )
 
 
-# ---------------------------------------------------------------------------
-# Shared helpers
-# ---------------------------------------------------------------------------
+# --- Helpers ---
 
-def _filter_by_difficulty(
-    pool: List[Dict[str, Any]], difficulty: Optional[str],
-) -> List[Dict[str, Any]]:
-    """Filter content items by difficulty, raising 400 on invalid values."""
+def _filter_by_difficulty(pool: List[Dict[str, Any]], difficulty: Optional[str]) -> List[Dict[str, Any]]:
     if not difficulty:
         return pool
     if difficulty not in ("easy", "medium", "hard"):
@@ -80,30 +50,17 @@ def _filter_by_difficulty(
 
 
 def _lookup_content(content_id: str) -> Dict[str, Any]:
-    """Look up a content item by ID, raising 404 if not found."""
     item = CONTENT_INDEX.get(content_id)
     if item is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"content_id '{content_id}' not found. Use GET /tasks to get valid IDs.",
-        )
+        raise HTTPException(status_code=404, detail=f"content_id '{content_id}' not found")
     return item
 
 
 def _strip_gold_labels(item: Dict[str, Any]) -> Dict[str, Any]:
-    """Return a content item without gold labels (safe for public display)."""
-    return {
-        "content_id": item["content_id"],
-        "content_text": item["content_text"],
-        "content_type": item["content_type"],
-        "platform": item["platform"],
-        "difficulty": item["difficulty"],
-    }
+    return {k: item[k] for k in ("content_id", "content_text", "content_type", "platform", "difficulty")}
 
 
-# ---------------------------------------------------------------------------
-# Baseline agent
-# ---------------------------------------------------------------------------
+# --- Baseline agent ---
 
 _CRITICAL_KW = ["kill", "murder", "terrorist", "bomb", "rape", "child porn", "cp ", "slur"]
 _REJECT_KW = [
@@ -118,11 +75,7 @@ _ESCALATE_KW = [
 
 
 def baseline_agent(text: str, content_type: str = "", platform: str = "") -> Dict[str, Any]:
-    """Simple keyword-based baseline agent.
-
-    Accepts the same (text, content_type, platform) signature as smart_agent
-    so it can be passed directly to evaluate_agent().
-    """
+    """Simple keyword-based baseline agent."""
     text_lower = text.lower()
     flagged = [kw for kw in _CRITICAL_KW + _REJECT_KW + _ESCALATE_KW if kw in text_lower]
 
@@ -149,26 +102,16 @@ def baseline_agent(text: str, content_type: str = "", platform: str = "") -> Dic
     )
 
     return {
-        "decision": decision,
-        "iab_category": iab,
-        "garm_category": garm,
-        "risk_level": risk,
-        "reasoning": reasoning,
-        "confidence": confidence,
+        "decision": decision, "iab_category": iab, "garm_category": garm,
+        "risk_level": risk, "reasoning": reasoning, "confidence": confidence,
         "flagged_elements": flagged[:5],
     }
 
 
-# ---------------------------------------------------------------------------
-# GET /tasks — sample tasks for evaluation
-# ---------------------------------------------------------------------------
+# --- GET /tasks ---
 
 @app.get("/tasks", tags=["Hackathon"])
-def get_tasks(
-    n: int = 5,
-    difficulty: Optional[str] = None,
-    seed: Optional[int] = None,
-) -> Dict[str, Any]:
+def get_tasks(n: int = 5, difficulty: Optional[str] = None, seed: Optional[int] = None) -> Dict[str, Any]:
     """Return a sample of UGC content items for agent evaluation."""
     if not 1 <= n <= 30:
         raise HTTPException(status_code=400, detail="n must be between 1 and 30")
@@ -184,12 +127,9 @@ def get_tasks(
     }
 
 
-# ---------------------------------------------------------------------------
-# POST /grader — standalone grader
-# ---------------------------------------------------------------------------
+# --- POST /grader ---
 
 class GraderRequest(BaseModel):
-    """Request body for the /grader endpoint."""
     content_id: str = Field(..., description="Content ID from /tasks")
     decision: str = Field(..., description="APPROVE, REJECT, or ESCALATE")
     iab_category: str = Field(..., description="IAB Content Taxonomy category")
@@ -198,7 +138,7 @@ class GraderRequest(BaseModel):
     reasoning: str = Field(..., description="Explanation of the decision")
     confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence score [0,1]")
     flagged_elements: List[str] = Field(default_factory=list)
-    steps_taken: int = Field(default=1, ge=1, le=3, description="Steps agent took (1-3)")
+    steps_taken: int = Field(default=1, ge=1, le=3)
 
 
 @app.post("/grader", tags=["Hackathon"])
@@ -221,14 +161,10 @@ def grader_endpoint(request: GraderRequest) -> Dict[str, Any]:
     }
 
 
-# ---------------------------------------------------------------------------
-# GET /baseline — baseline agent demo
-# ---------------------------------------------------------------------------
+# --- GET /baseline ---
 
 @app.get("/baseline", tags=["Hackathon"])
-def baseline_demo(
-    content_id: Optional[str] = None, seed: Optional[int] = 42,
-) -> Dict[str, Any]:
+def baseline_demo(content_id: Optional[str] = None, seed: Optional[int] = 42) -> Dict[str, Any]:
     """Run the keyword-based baseline agent on a content item."""
     if content_id:
         item = _lookup_content(content_id)
@@ -251,14 +187,9 @@ def baseline_demo(
     }
 
 
-# ---------------------------------------------------------------------------
-# GET /evaluate — batch evaluation
-# ---------------------------------------------------------------------------
+# --- GET /evaluate ---
 
-_AGENTS = {
-    "smart": smart_agent,
-    "baseline": baseline_agent,
-}
+_AGENTS = {"smart": smart_agent, "baseline": baseline_agent}
 
 
 @app.get("/evaluate", tags=["Hackathon"])
@@ -279,9 +210,7 @@ def evaluate_endpoint(
     return result
 
 
-# ---------------------------------------------------------------------------
-# GET /web — interactive dashboard
-# ---------------------------------------------------------------------------
+# --- GET /web ---
 
 _DASHBOARD_PATH = Path(__file__).parent / "dashboard.html"
 
@@ -292,12 +221,9 @@ def web_dashboard():
     return _DASHBOARD_PATH.read_text(encoding="utf-8")
 
 
-# ---------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------
+# --- Entry point ---
 
 def main(host: str = "0.0.0.0", port: int = 8000):
-    """Entry point for ``uv run server`` or ``python -m``."""
     import uvicorn
     uvicorn.run(app, host=host, port=port)
 

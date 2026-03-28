@@ -1,15 +1,4 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
-#
-# This source code is licensed under the BSD-style license found in the
-# LICENSE file in the root directory of this source tree.
-
-"""
-30 curated UGC content items with gold labels for brand-safe ad review.
-
-Difficulty distribution: 10 easy, 10 medium, 10 hard.
-Gold labels follow IAB Content Taxonomy 3.0 and GARM Brand Safety Floor standards.
-"""
+"""30 curated UGC content items with gold labels for brand-safe ad review."""
 
 from typing import Any, Dict, List
 

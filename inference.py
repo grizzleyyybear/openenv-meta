@@ -1,14 +1,9 @@
 """
 Inference Script — Brand-Safe Ad Review Environment
-===================================
-MANDATORY
-- Before submitting, ensure the following variables are defined in your environment configuration:
-    API_BASE_URL   The API endpoint for the LLM.
-    MODEL_NAME     The model identifier to use for inference.
-    HF_TOKEN       Your Hugging Face / API key.
-
-- The inference script must be named `inference.py` and placed in the root directory of the project
-- Participants must use OpenAI Client for all LLM calls using above variables
+====================================================
+Required env vars: API_BASE_URL, MODEL_NAME, HF_TOKEN
+Must be named inference.py at project root.
+Uses OpenAI Client for all LLM calls.
 """
 
 import json
@@ -21,21 +16,16 @@ from typing import Any, Dict, List, Optional
 import requests
 from openai import OpenAI
 
-# ---------------------------------------------------------------------------
-# Configuration from environment
-# ---------------------------------------------------------------------------
+# --- Configuration ---
 
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
 MODEL_NAME = os.getenv("MODEL_NAME")
 ENV_URL = os.getenv("ENV_URL", "http://localhost:8000")
-
 TEMPERATURE = 0.0
 MAX_TOKENS = 2048
 
-# ---------------------------------------------------------------------------
-# Valid values (must match ad_review_env/models.py)
-# ---------------------------------------------------------------------------
+# --- Valid values (must match ad_review_env/models.py) ---
 
 VALID_DECISIONS = {"APPROVE", "REJECT", "ESCALATE"}
 VALID_IAB = {
@@ -51,9 +41,7 @@ VALID_GARM = {
 }
 VALID_RISK = {"LOW", "MEDIUM", "HIGH", "CRITICAL"}
 
-# ---------------------------------------------------------------------------
-# LLM system prompt
-# ---------------------------------------------------------------------------
+# --- LLM system prompt ---
 
 SYSTEM_PROMPT = textwrap.dedent("""\
 You are an expert content moderator reviewing user-generated content (UGC)
@@ -118,9 +106,7 @@ Content: "POV: explaining to parents why you dropped out to trade crypto full ti
 
 Respond with ONLY the JSON object. No other text.""")
 
-# ---------------------------------------------------------------------------
-# Fallback action (used when LLM parsing fails)
-# ---------------------------------------------------------------------------
+# --- Fallback action ---
 
 FALLBACK_ACTION: Dict[str, Any] = {
     "decision": "ESCALATE",
@@ -133,12 +119,10 @@ FALLBACK_ACTION: Dict[str, Any] = {
 }
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+# --- Helpers ---
 
 def extract_json(text: str) -> Optional[Dict]:
-    """Extract a JSON object from LLM output, handling thinking tags and code blocks."""
+    """Extract JSON from LLM output, handling <think> tags and code blocks."""
     # Strip reasoning model thinking tokens (<think>...</think>)
     text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
     # Strip any other XML-like tags that reasoning models emit
@@ -171,7 +155,7 @@ def extract_json(text: str) -> Optional[Dict]:
 
 
 def validate_action(raw: Dict) -> Dict[str, Any]:
-    """Validate and sanitize an action dict, fixing common LLM mistakes."""
+    """Validate and sanitize an action dict from LLM output."""
     action: Dict[str, Any] = {}
 
     decision = str(raw.get("decision", "ESCALATE")).upper().strip()
@@ -207,14 +191,10 @@ def validate_action(raw: Dict) -> Dict[str, Any]:
 
 
 def call_llm(
-    client: OpenAI,
-    content_text: str,
-    content_type: str,
-    platform: str,
-    additional_context: Optional[str] = None,
-    retries: int = 2,
+    client: OpenAI, content_text: str, content_type: str, platform: str,
+    additional_context: Optional[str] = None, retries: int = 2,
 ) -> Dict[str, Any]:
-    """Use the LLM to review a UGC content item and return an action dict."""
+    """Use the LLM to review a UGC content item."""
     user_msg = (
         f"Platform: {platform}\n"
         f"Content type: {content_type}\n"
@@ -260,11 +240,7 @@ def call_llm(
 
 
 def should_request_context(action: Dict[str, Any], difficulty: str) -> bool:
-    """Decide whether to request additional context before final decision.
-
-    Strategy: request context for hard/medium items when the LLM is uncertain.
-    Easy items are decided immediately for efficiency.
-    """
+    """Request context for hard/medium items when the LLM is uncertain."""
     if difficulty == "easy":
         return False
     if action.get("confidence", 1.0) < 0.7:
@@ -274,19 +250,10 @@ def should_request_context(action: Dict[str, Any], difficulty: str) -> bool:
     return False
 
 
-# ---------------------------------------------------------------------------
-# Multi-step episode execution via HTTP
-# ---------------------------------------------------------------------------
+# --- Multi-step episode execution ---
 
-def run_episode_via_api(
-    client: OpenAI, env_url: str, task: Dict[str, Any],
-) -> Dict[str, Any]:
-    """Run a single multi-step episode against the environment.
-
-    1. POST /reset → get initial observation
-    2. Optionally REQUEST_CONTEXT via POST /step
-    3. DECIDE via POST /step → get scored result
-    """
+def run_episode_via_api(client: OpenAI, env_url: str, task: Dict[str, Any]) -> Dict[str, Any]:
+    """Run a single multi-step episode against the environment."""
     # Reset to start a new episode (with seed for reproducibility)
     reset_resp = requests.post(f"{env_url}/reset", timeout=10)
     reset_resp.raise_for_status()
@@ -326,12 +293,10 @@ def run_episode_via_api(
     return {"action": action, "steps_taken": steps_taken}
 
 
-# ---------------------------------------------------------------------------
-# Evaluation
-# ---------------------------------------------------------------------------
+# --- Evaluation ---
 
 def run_evaluation(client: OpenAI, env_url: str) -> Dict[str, Any]:
-    """Run inference across all tasks and collect scores."""
+    """Run inference across all 30 tasks and collect scores."""
 
     # 1. Verify environment is reachable
     try:
@@ -439,12 +404,9 @@ def print_report(eval_data: Dict[str, Any]) -> None:
     print(f"\n{'=' * 60}")
 
 
-# ---------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------
+# --- Entry point ---
 
 def main():
-    """Run LLM-based inference against the Brand-Safe Ad Review environment."""
     assert API_KEY, (
         "Missing API key. Set HF_TOKEN or API_KEY environment variable."
     )

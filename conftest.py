@@ -1,12 +1,9 @@
-"""Root conftest — create openenv stubs BEFORE any package imports."""
+"""Root conftest — create openenv stubs before any package imports."""
 
 import sys
 import os
 import types
 from typing import Optional
-
-# Must create openenv stubs before pytest discovers ad_review_env/__init__.py,
-# which does `from .client import AdReviewEnv` → `from openenv.core import EnvClient`.
 
 if "openenv" not in sys.modules:
     from pydantic import BaseModel, ConfigDict

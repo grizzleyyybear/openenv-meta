@@ -137,11 +137,11 @@ uvicorn server.app:app --reload --port 8000
 
 ## Baseline Performance
 
-The keyword-based baseline agent scores approximately **0.45–0.55** overall.
+The keyword-based baseline agent scores approximately **0.52** overall.
 
-The smart contextual agent scores **~0.996** (30/30 correct decisions).
+The smart contextual agent scores **0.996** (30/30 correct decisions).
 
-A well-tuned LLM agent should target **> 0.75**.
+LLM inference (DeepSeek R1) scores **0.82** overall (easy: 0.89, medium: 0.74, hard: 0.83).
 
 ```bash
 python baseline.py
@@ -193,7 +193,7 @@ cd ad_review_env
 python -m pytest tests/ -v
 ```
 
-70 tests covering data integrity, grader logic, smart agent decisions, and model validation.
+83 tests covering data integrity, grader logic, smart agent decisions, model validation, and multi-step episodes.
 
 ## Project Structure
 

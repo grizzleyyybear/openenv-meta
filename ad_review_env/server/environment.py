@@ -1,11 +1,8 @@
 """
-Core environment logic for the Brand-Safe Ad Review environment.
+Core environment logic — multi-step episodes for UGC content moderation.
 
-Multi-step episodes:
-  - Agent can REQUEST_CONTEXT to get enriched observations (author
-    history, community signals) before making a final DECIDE.
-  - Max 3 steps per episode. Fewer steps → higher efficiency score.
-  - If max steps reached without DECIDE, auto-ESCALATE with penalty.
+Agents can REQUEST_CONTEXT to get enriched observations (author history,
+community signals) before making a final DECIDE. Max 3 steps per episode.
 """
 
 import random
@@ -28,25 +25,7 @@ MAX_STEPS = 3
 
 
 class AdReviewEnvironment(Environment):
-    """
-    Brand-Safe Ad Review environment for UGC content moderation.
-
-    Each episode presents one UGC content item. The agent must:
-    1. Decide: APPROVE / REJECT / ESCALATE
-    2. Classify: IAB Content Taxonomy + GARM Brand Safety Floor category
-    3. Assess: risk level and confidence
-    4. Explain: reasoning with specific flagged elements
-
-    The agent may optionally REQUEST_CONTEXT before deciding, to receive
-    author history and community signals. Efficient agents that decide
-    correctly in fewer steps receive higher scores.
-
-    Reward formula (max 1.0):
-        0.4 × decision accuracy
-        0.3 × category accuracy (IAB + GARM)
-        0.2 × reasoning quality
-        0.1 × confidence calibration × step-efficiency multiplier
-    """
+    """Each episode presents one UGC item. The agent reviews and classifies it."""
 
     SUPPORTS_CONCURRENT_SESSIONS: bool = True
 
@@ -94,15 +73,7 @@ class AdReviewEnvironment(Environment):
         timeout_s: Optional[float] = None,
         **kwargs,
     ) -> AdReviewObservation:
-        """
-        Execute one review step.
-
-        If action_type is REQUEST_CONTEXT: reveals the next context layer
-        and returns done=False (unless max steps reached).
-
-        If action_type is DECIDE (or max steps forced): grades the
-        decision and returns done=True.
-        """
+        """Execute one review step."""
         if self._current_item is None:
             self.reset()
 
@@ -178,7 +149,6 @@ class AdReviewEnvironment(Environment):
         )
 
     def _get_next_context(self) -> str:
-        """Reveal the next context layer and return it."""
         layer_num = len(self._revealed_context) + 1
         key = f"context_layer_{layer_num}"
         context = self._current_item.get(key, "No additional context available.")
@@ -186,11 +156,7 @@ class AdReviewEnvironment(Environment):
         return context
 
     def _format_all_context(self) -> str:
-        """Format all revealed context layers into a single string."""
-        parts = []
-        for i, ctx in enumerate(self._revealed_context, 1):
-            parts.append(f"[Context {i}] {ctx}")
-        return "\n".join(parts)
+        return "\n".join(f"[Context {i}] {ctx}" for i, ctx in enumerate(self._revealed_context, 1))
 
     @property
     def state(self) -> State:

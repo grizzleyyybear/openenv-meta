@@ -1,9 +1,3 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
-#
-# This source code is licensed under the BSD-style license found in the
-# LICENSE file in the root directory of this source tree.
-
 """Brand-Safe Ad Review Environment Client."""
 
 from typing import Dict
@@ -16,28 +10,7 @@ from .models import AdReviewAction, AdReviewObservation
 
 
 class AdReviewEnv(EnvClient[AdReviewAction, AdReviewObservation, State]):
-    """
-    Client for the Brand-Safe Ad Review Environment.
-
-    Maintains a persistent WebSocket connection to the environment server.
-
-    Example:
-        >>> with AdReviewEnv(base_url="http://localhost:8000") as env:
-        ...     result = env.reset()
-        ...     print(result.observation.content_text)
-        ...
-        ...     action = AdReviewAction(
-        ...         decision="APPROVE",
-        ...         iab_category="IAB_SAFE",
-        ...         garm_category="GARM_SAFE",
-        ...         risk_level="LOW",
-        ...         reasoning="Content is a standard lifestyle post with no harmful elements.",
-        ...         confidence=0.95,
-        ...     )
-        ...     result = env.step(action)
-        ...     print(f"Score: {result.observation.total_score:.3f}")
-        ...     print(result.observation.feedback)
-    """
+    """WebSocket client for the Brand-Safe Ad Review environment."""
 
     def _step_payload(self, action: AdReviewAction) -> Dict:
         return {

@@ -1,18 +1,8 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
-#
-# This source code is licensed under the BSD-style license found in the
-# LICENSE file in the root directory of this source tree.
-
 """
-Baseline agent for the Brand-Safe Ad Review environment.
-
-Runs the keyword-based heuristic agent across all 30 content items
-and reports aggregate performance. Use this as a benchmark floor.
+Baseline keyword agent — run across all 30 items as a benchmark floor.
 
 Usage:
     python baseline.py
-    python baseline.py --url http://localhost:8000
 """
 
 import argparse
@@ -24,7 +14,7 @@ from grader import grade
 
 
 def run_baseline_agent(text: str) -> Dict:
-    """Keyword-based heuristic agent (same logic as /baseline endpoint)."""
+    """Keyword-based heuristic agent."""
     text_lower = text.lower()
 
     critical_kw = ["kill", "murder", "terrorist", "bomb", "rape", "slur"]

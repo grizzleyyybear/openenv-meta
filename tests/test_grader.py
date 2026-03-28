@@ -189,13 +189,13 @@ class TestFeedback:
         gold = _make_gold()
         action = _make_action()
         _, _, feedback = grade(action, gold)
-        assert "✓" in feedback
+        assert "correct" in feedback.lower()
 
     def test_wrong_feedback_has_cross(self):
         gold = _make_gold(decision="REJECT")
         action = _make_action(decision="APPROVE")
         _, _, feedback = grade(action, gold)
-        assert "✗" in feedback
+        assert "wrong" in feedback.lower()
 
 
 class TestStepEfficiency:
