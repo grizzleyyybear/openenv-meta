@@ -39,6 +39,13 @@ app = create_app(
 )
 
 
+@app.get("/", tags=["Root"])
+def root():
+    """Root endpoint — redirects to interactive dashboard."""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/web")
+
+
 # --- Helpers ---
 
 def _filter_by_difficulty(pool: List[Dict[str, Any]], difficulty: Optional[str]) -> List[Dict[str, Any]]:
