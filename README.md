@@ -8,7 +8,7 @@ Agents review UGC posts, classify them using **IAB Content Taxonomy 3.0** and **
 
 ## Why This Matters
 
-Every major platform employs content moderators to decide what's brand-safe. It's a $10B+ market, and the decisions are nuanced — a nurse advocating for gun reform is different from a political attack post, even though both mention violence. This environment captures that nuance with 30 real-world-style UGC items spanning obvious violations to subtle edge cases that challenge frontier models.
+Every major platform employs content moderators to decide what's brand-safe. It's a $10B+ market, and the decisions are nuanced — a nurse advocating for gun reform is different from a political attack post, even though both mention violence. This environment captures that nuance with 50 real-world-style UGC items spanning obvious violations to subtle edge cases that challenge frontier models.
 
 ## How It Works
 
@@ -42,13 +42,13 @@ Fewer steps = higher efficiency score. Easy items should be nailed in one step.
 
 Step-efficiency: 1 step → 1.0×, 2 steps → 0.7×, 3 steps → 0.4×. Hard tasks get a 1.1× difficulty multiplier.
 
-## Tasks (3 tiers, 30 items)
+## Tasks (3 tiers, 50 items)
 
 | Tier | Count | What's tested | Example |
 |------|-------|--------------|---------|
-| **Easy** | 10 | Obvious safe/unsafe signals | Cookie recipe (approve) · Drug sales bio (reject) |
-| **Medium** | 10 | Context-dependent judgment | Wine tasting in Tuscany · Gambling in Vegas trip context |
-| **Hard** | 10 | Subtle edge cases | Nurse advocating gun reform · Labeled satire · Crypto targeting teens |
+| **Easy** | 15 | Obvious safe/unsafe signals | Cookie recipe (approve) · Drug sales bio (reject) |
+| **Medium** | 18 | Context-dependent judgment | Wine tasting in Tuscany · Gambling in Vegas trip context |
+| **Hard** | 17 | Subtle edge cases | Nurse advocating gun reform · Labeled satire · Crypto targeting teens |
 
 Each item has gold labels, context layers, and deterministic grading.
 
@@ -117,7 +117,7 @@ pip install openai requests
 python inference.py
 ```
 
-The script fetches all 30 tasks, calls the LLM for each, grades via `/grader`, and reports scores. Runs under 20 minutes on 2 vCPU / 8GB RAM.
+The script fetches all 50 tasks, calls the LLM for each, grades via `/grader`, and reports scores. Runs under 20 minutes on 2 vCPU / 8GB RAM.
 
 ## Baseline Scores
 
@@ -155,7 +155,7 @@ openenv-meta/
 └── ad_review_env/             # The environment package
     ├── pyproject.toml
     ├── models.py              # Typed Pydantic action/observation models
-    ├── data.py                # 30 UGC items with gold labels + context layers
+    ├── data.py                # 50 UGC items with gold labels + context layers
     ├── grader.py              # Deterministic reward grader
     ├── agent.py               # Smart contextual agent (~0.996)
     ├── client.py              # WebSocket client

@@ -32,34 +32,38 @@ VALID_GARM = {
 VALID_RISK = {"LOW", "MEDIUM", "HIGH", "CRITICAL"}
 
 SYSTEM_PROMPT = textwrap.dedent("""\
-You are an expert content moderator reviewing user-generated content (UGC)
-for brand-safe ad placement using IAB Content Taxonomy 3.0 and GARM Brand
-Safety Floor standards.
+You are an expert content moderator for brand-safe ad placement using IAB
+Content Taxonomy 3.0 and GARM Brand Safety Floor standards.
 
-Respond with ONLY a JSON object, no other text:
+Respond with ONLY a JSON object:
 {"decision":"...","iab_category":"...","garm_category":"...","risk_level":"...","reasoning":"...","confidence":0.0,"flagged_elements":["..."]}
 
-REJECT — clearly harmful or unsafe for ANY brand:
+REJECT — harmful, deceptive, or unsafe for ANY brand:
   - Explicit profanity, slurs, violent threats (even hyperbolic)
-  - Hate speech, discrimination, extremist promotion
+  - Hate speech, discrimination, coded extremist language ("great replacement", ethno-nationalism)
   - Illegal activity: drug sales, piracy, fraud
-  - Health misinformation: anti-vax, fake cures, dangerous claims
-  - Political attacks, conspiracy theories, inflammatory content
+  - Health misinformation: miracle cures, "doctors don't want you to know", anti-vax
+  - MLM/pyramid scheme recruitment: "join my team", "DM me", income claims, "#girlboss #financialfreedom"
+  - Gambling/casino PROMOTION: affiliate codes, "free spins", casino links, gambling ads
+  - Weight loss scams: "one weird trick", unrealistic transformation claims with sales links
+  - Political attacks, conspiracy theories
   - Graphic violence, explicit adult content
 
-ESCALATE — ambiguous, dual-use, or brand-dependent:
+ESCALATE — ambiguous, divisive, or brand-dependent:
+  - Political humor/memes about specific politicians or government (even lighthearted)
+  - Geopolitical advocacy: Israel/Palestine, peace activism, war-related content
   - Legitimate advocacy on divisive topics by credible sources
   - Personal drug experiences as mental health discussion (not promotion)
-  - Gambling in personal/travel context (not promotion)
+  - Supplement promotion without clear fraud signals (borderline health claims)
   - Financial risk content targeting young audiences (crypto, day trading)
-  - Leaked/whistleblower content, content needing more context
+  - Content where decision depends heavily on author credibility or audience context
 
 APPROVE — clearly brand-safe:
   - Lifestyle, fitness, food, pets, travel, education, DIY
   - Labeled satire/parody, historical remembrance, charity
   - Gaming reviews (fictional violence is fine)
   - Recovery/growth narratives, wine in dining context
-  - Evidence-based health content
+  - Evidence-based health content from credible sources
 
 IAB: IAB_SAFE, IAB_ADULT, IAB_VIOLENCE, IAB_HATE_SPEECH, IAB_ILLEGAL, IAB_MISINFORMATION, IAB_PROFANITY, IAB_DRUGS, IAB_GAMBLING, IAB_CONTROVERSIAL
 GARM: GARM_SAFE, GARM_ADULT_EXPLICIT, GARM_ARMS_AMMUNITION, GARM_CRIME_HARMFUL, GARM_DEATH_INJURY, GARM_HATE_SPEECH, GARM_OBSCENITY_PROFANITY, GARM_ONLINE_PIRACY, GARM_SPAM_HARMFUL, GARM_TERRORISM
@@ -69,17 +73,26 @@ EXAMPLES:
 Content: "I want to f***ing kill my sister she ate my last slice of pizza"
 {"decision":"REJECT","iab_category":"IAB_PROFANITY","garm_category":"GARM_OBSCENITY_PROFANITY","risk_level":"HIGH","reasoning":"Explicit profanity with violent language, even if hyperbolic.","confidence":0.92,"flagged_elements":["f***ing","kill"]}
 
+Content: "Lost 30lbs in 30 days with this ONE weird trick! Link in bio"
+{"decision":"REJECT","iab_category":"IAB_MISINFORMATION","garm_category":"GARM_SPAM_HARMFUL","risk_level":"HIGH","reasoning":"Classic weight loss scam with unrealistic claims and sales link. Deceptive health misinformation.","confidence":0.95,"flagged_elements":["ONE weird trick","30lbs in 30 days","Link in bio"]}
+
+Content: "Use code SPIN50 for 50 free spins! I just won $2K in 10 minutes #gambling #ad"
+{"decision":"REJECT","iab_category":"IAB_GAMBLING","garm_category":"GARM_CRIME_HARMFUL","risk_level":"HIGH","reasoning":"Gambling promotion with affiliate code and misleading ease-of-winning claims.","confidence":0.93,"flagged_elements":["free spins","affiliate code","$2K in 10 minutes"]}
+
+Content: "Join my team and start earning $10K/month from your phone! DM 'FREEDOM' #girlboss"
+{"decision":"REJECT","iab_category":"IAB_MISINFORMATION","garm_category":"GARM_SPAM_HARMFUL","risk_level":"HIGH","reasoning":"MLM/pyramid scheme recruitment with unrealistic income claims.","confidence":0.94,"flagged_elements":["$10K/month","join my team","DM","#girlboss"]}
+
+Content: "We need to secure a future for our people. The great replacement is real. Stay based, kings"
+{"decision":"REJECT","iab_category":"IAB_HATE_SPEECH","garm_category":"GARM_HATE_SPEECH","risk_level":"CRITICAL","reasoning":"Coded white-nationalist rhetoric using known extremist phrases.","confidence":0.95,"flagged_elements":["great replacement","secure a future for our people","based"]}
+
+Content: "lol whoever made this meme of the senator falling asleep deserves an award #politics"
+{"decision":"ESCALATE","iab_category":"IAB_CONTROVERSIAL","garm_category":"GARM_SAFE","risk_level":"MEDIUM","reasoning":"Political humor about specific politician. Lighthearted but brand-sensitive political content.","confidence":0.80,"flagged_elements":["senator","politics"]}
+
+Content: "As a peace activist, I've sat with families on both sides who've lost children. Peace isn't weakness."
+{"decision":"ESCALATE","iab_category":"IAB_CONTROVERSIAL","garm_category":"GARM_SAFE","risk_level":"MEDIUM","reasoning":"Geopolitical peace advocacy on highly divisive conflict. Credible but brand-sensitive.","confidence":0.78,"flagged_elements":["both sides","lost children"]}
+
 Content: "Microdosing psilocybin has helped my anxiety more than any prescription."
-{"decision":"ESCALATE","iab_category":"IAB_DRUGS","garm_category":"GARM_CRIME_HARMFUL","risk_level":"MEDIUM","reasoning":"Personal mental health narrative involving controlled substance. Not promotion but requires human review.","confidence":0.75,"flagged_elements":["psilocybin","microdosing"]}
-
-Content: "This politician is destroying democracy. Can't believe people vote for this clown."
-{"decision":"REJECT","iab_category":"IAB_CONTROVERSIAL","garm_category":"GARM_SPAM_HARMFUL","risk_level":"MEDIUM","reasoning":"Political attack with inflammatory language. Brand risk regardless of target.","confidence":0.85,"flagged_elements":["destroying democracy","clown"]}
-
-Content: "POV: explaining to parents why you dropped out to trade crypto full time"
-{"decision":"ESCALATE","iab_category":"IAB_CONTROVERSIAL","garm_category":"GARM_SAFE","risk_level":"MEDIUM","reasoning":"Financial risk content targeting young audience. Normalizes high-risk behavior.","confidence":0.78,"flagged_elements":["dropped out","crypto"]}
-
-Content: "As a nurse, I see patients die from gun violence every week. We need reform NOW."
-{"decision":"ESCALATE","iab_category":"IAB_CONTROVERSIAL","garm_category":"GARM_DEATH_INJURY","risk_level":"MEDIUM","reasoning":"Professional advocacy on divisive topic. Credible but brand-sensitive.","confidence":0.80,"flagged_elements":["gun violence","die"]}
+{"decision":"ESCALATE","iab_category":"IAB_DRUGS","garm_category":"GARM_CRIME_HARMFUL","risk_level":"MEDIUM","reasoning":"Personal mental health narrative involving controlled substance. Not promotion but requires review.","confidence":0.75,"flagged_elements":["psilocybin","microdosing"]}
 
 Respond with ONLY the JSON object.""")
 
@@ -220,7 +233,7 @@ def run_evaluation(client: OpenAI, env_url: str) -> Dict[str, Any]:
     except Exception as e:
         raise RuntimeError(f"Cannot reach environment at {env_url}: {e}") from e
 
-    resp = requests.get(f"{env_url}/tasks", params={"n": 30, "seed": 42}, timeout=30)
+    resp = requests.get(f"{env_url}/tasks", params={"n": 50, "seed": 42}, timeout=30)
     resp.raise_for_status()
     tasks = resp.json()["tasks"]
     print(f"Fetched {len(tasks)} tasks\n")
