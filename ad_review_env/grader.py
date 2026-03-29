@@ -1,9 +1,4 @@
-"""
-Deterministic grader for the Brand-Safe Ad Review environment.
-
-Reward (max 1.0) = 0.4×decision + 0.3×category + 0.2×reasoning + 0.1×efficiency
-Step-efficiency: 1 step → 1.0×, 2 steps → 0.7×, 3 steps → 0.4×
-"""
+"""Deterministic grader. Reward = 0.4*decision + 0.3*category + 0.2*reasoning + 0.1*efficiency."""
 
 from typing import Any, Dict, Tuple
 
