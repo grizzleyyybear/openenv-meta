@@ -14,10 +14,10 @@ class TestSmartAgentOverall:
         result = evaluate_all(CONTENT_ITEMS, grade)
         assert result["aggregate"]["decision_accuracy"] > 0.90
 
-    def test_all_30_items_processed(self):
+    def test_all_50_items_processed(self):
         result = evaluate_all(CONTENT_ITEMS, grade)
-        assert result["aggregate"]["total_items"] == 30
-        assert len(result["results"]) == 30
+        assert result["aggregate"]["total_items"] == 50
+        assert len(result["results"]) == 50
 
 
 class TestSmartAgentDecisions:

@@ -13,14 +13,14 @@ author: "Meta OpenEnv Hackathon"
 
 tasks:
   - id: easy
-    description: "Clear-cut content moderation (10 items) — obvious safe/unsafe signals"
+    description: "Clear-cut content moderation (15 items) — obvious safe/unsafe signals"
     difficulty: easy
-    count: 10
+    count: 15
   - id: medium
-    description: "Context-dependent moderation (10 items) — alcohol, politics, gambling"
+    description: "Context-dependent moderation (18 items) — alcohol, politics, gambling, health claims"
     difficulty: medium
-    count: 10
+    count: 18
   - id: hard
-    description: "Subtle edge cases (10 items) — satire, advocacy, coded language"
+    description: "Subtle edge cases (17 items) — satire, advocacy, coded language, recovery narratives"
     difficulty: hard
-    count: 10
+    count: 17

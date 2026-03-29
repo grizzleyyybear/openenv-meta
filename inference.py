@@ -220,7 +220,7 @@ def run_evaluation(client: OpenAI, env_url: str) -> Dict[str, Any]:
     except Exception as e:
         raise RuntimeError(f"Cannot reach environment at {env_url}: {e}") from e
 
-    resp = requests.get(f"{env_url}/tasks", params={"n": 30, "seed": 42}, timeout=30)
+    resp = requests.get(f"{env_url}/tasks", params={"n": 50, "seed": 42}, timeout=30)
     resp.raise_for_status()
     tasks = resp.json()["tasks"]
     print(f"Fetched {len(tasks)} tasks\n")

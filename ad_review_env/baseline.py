@@ -1,5 +1,5 @@
 """
-Baseline keyword agent — run across all 30 items as a benchmark floor.
+Baseline keyword agent — run across all 50 items as a benchmark floor.
 
 Usage:
     python baseline.py

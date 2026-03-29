@@ -98,8 +98,8 @@ def baseline_agent(text: str, content_type: str = "", platform: str = "") -> Dic
 
 @app.get("/tasks", tags=["Hackathon"])
 def get_tasks(n: int = 5, difficulty: Optional[str] = None, seed: Optional[int] = None) -> Dict[str, Any]:
-    if not 1 <= n <= 30:
-        raise HTTPException(status_code=400, detail="n must be between 1 and 30")
+    if not 1 <= n <= 50:
+        raise HTTPException(status_code=400, detail="n must be between 1 and 50")
     pool = _filter_by_difficulty(CONTENT_ITEMS, difficulty)
     sample = random.Random(seed).sample(pool, min(n, len(pool)))
     return {"tasks": [_strip_gold_labels(item) for item in sample], "count": len(sample), "total_available": len(pool)}

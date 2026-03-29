@@ -4,17 +4,17 @@ from ad_review_env.data import CONTENT_ITEMS, CONTENT_INDEX
 from ad_review_env.models import IAB_CATEGORIES, GARM_CATEGORIES
 
 
-def test_dataset_has_30_items():
-    assert len(CONTENT_ITEMS) == 30
+def test_dataset_has_50_items():
+    assert len(CONTENT_ITEMS) == 50
 
 
 def test_difficulty_distribution():
     by_diff = {}
     for item in CONTENT_ITEMS:
         by_diff.setdefault(item["difficulty"], []).append(item)
-    assert len(by_diff["easy"]) == 10
-    assert len(by_diff["medium"]) == 10
-    assert len(by_diff["hard"]) == 10
+    assert len(by_diff["easy"]) == 15
+    assert len(by_diff["medium"]) == 18
+    assert len(by_diff["hard"]) == 17
 
 
 def test_content_ids_are_unique():
@@ -23,7 +23,7 @@ def test_content_ids_are_unique():
 
 
 def test_content_index_matches():
-    assert len(CONTENT_INDEX) == 30
+    assert len(CONTENT_INDEX) == 50
     for item in CONTENT_ITEMS:
         assert item["content_id"] in CONTENT_INDEX
         assert CONTENT_INDEX[item["content_id"]] is item
