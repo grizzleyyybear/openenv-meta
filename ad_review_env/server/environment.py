@@ -42,7 +42,7 @@ class AdReviewEnvironment(Environment):
 
     def step(self, action: AdReviewAction, timeout_s: Optional[float] = None, **kwargs) -> AdReviewObservation:
         if self._current_item is None:
-            self.reset()
+            raise RuntimeError("Call reset() before step().")
 
         self._state.step_count += 1
         step_num = self._state.step_count
@@ -68,15 +68,18 @@ class AdReviewEnvironment(Environment):
 
         total_reward, scores, feedback = grade(action_data, self._current_item, steps_taken=step_num)
 
-        return self._make_obs(
+        obs = self._make_obs(
             step_number=step_num, done=True, reward=total_reward,
             score_decision=scores["decision"], score_category=scores["category"],
             score_reasoning=scores["reasoning"], score_efficiency=scores["efficiency"],
+            score_calibration=scores.get("calibration", 0.0),
             total_score=scores["total"], feedback=feedback,
             gold_decision=self._current_item["gold_decision"],
             gold_iab_category=self._current_item["gold_iab_category"],
             gold_garm_category=self._current_item["gold_garm_category"],
         )
+        self._current_item = None
+        return obs
 
     def _make_obs(self, step_number: int, done: bool, reward, **extra) -> AdReviewObservation:
         return AdReviewObservation(

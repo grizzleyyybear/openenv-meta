@@ -29,12 +29,13 @@ Fewer steps = higher efficiency score. Easy items should be nailed in one step.
 
 | Component | Weight | Signal |
 |-----------|--------|--------|
-| Decision accuracy | 40% | Correct APPROVE/REJECT/ESCALATE |
-| Category accuracy | 30% | Correct IAB + GARM |
-| Reasoning quality | 20% | Length + flagged elements |
-| Efficiency | 10% | Confidence calibration × step-efficiency |
+| Decision accuracy | 35% | Correct APPROVE/REJECT/ESCALATE (graded adjacency) |
+| Category accuracy | 25% | IAB (40%) + GARM (40%) + risk proximity (20%) |
+| Reasoning quality | 20% | Length + flagged elements + domain-specific terms |
+| Step efficiency | 10% | Fewer steps = higher score |
+| Calibration | 10% | Confidence aligned with correctness (penalizes overconfident wrong answers) |
 
-Step-efficiency: 1 step → 1.0×, 2 steps → 0.7×, 3 steps → 0.4×. Hard tasks get a 1.1× difficulty multiplier.
+Adjacency: REJECT↔ESCALATE gets 0.4 partial credit, APPROVE↔ESCALATE gets 0.15. Step-efficiency: 1 step → 1.0×, 2 → 0.7×, 3 → 0.4×. Hard tasks get 1.1× multiplier.
 
 ## Tasks (3 tiers, 50 items)
 

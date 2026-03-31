@@ -70,6 +70,7 @@ class AdReviewObservation(Observation):
     score_category: float = Field(default=0.0)
     score_reasoning: float = Field(default=0.0)
     score_efficiency: float = Field(default=0.0)
+    score_calibration: float = Field(default=0.0)
     total_score: float = Field(default=0.0)
 
     feedback: str = Field(default="")

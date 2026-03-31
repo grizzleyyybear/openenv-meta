@@ -1,6 +1,7 @@
 """Inference script for Brand-Safe Ad Review. Env vars: API_BASE_URL, MODEL_NAME, HF_TOKEN."""
 
 import json
+import logging
 import os
 import re
 import statistics
@@ -9,6 +10,9 @@ from typing import Any, Dict, List, Optional
 
 import requests
 from openai import OpenAI
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+log = logging.getLogger(__name__)
 
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
@@ -182,10 +186,12 @@ def call_llm(
             parsed = extract_json(response.choices[0].message.content or "")
             if parsed is not None:
                 return validate_action(parsed)
+            log.warning("Attempt %d: failed to parse JSON from LLM response", attempt + 1)
             if attempt < retries - 1:
                 continue
             return FALLBACK_ACTION.copy()
-        except Exception:
+        except Exception as e:
+            log.warning("Attempt %d: API error: %s", attempt + 1, e)
             if attempt < retries - 1:
                 continue
             return FALLBACK_ACTION.copy()

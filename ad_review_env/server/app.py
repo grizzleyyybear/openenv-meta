@@ -147,7 +147,7 @@ _AGENTS = {"smart": smart_agent, "baseline": baseline_agent}
 
 
 class AnalyzeRequest(BaseModel):
-    content_text: str = Field(..., min_length=1)
+    content_text: str = Field(..., min_length=1, max_length=5000)
     content_type: str = Field(default="post")
     platform: str = Field(default="social_media")
 
