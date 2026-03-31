@@ -4,19 +4,20 @@ from ad_review_env.grader import grade
 
 
 def _make_gold(decision="APPROVE", iab="IAB_SAFE", garm="GARM_SAFE",
-               risk="LOW", difficulty="easy"):
+               risk="LOW", difficulty="easy", age_rating="TEEN"):
     return {
         "gold_decision": decision,
         "gold_iab_category": iab,
         "gold_garm_category": garm,
         "gold_risk_level": risk,
+        "gold_age_rating": age_rating,
         "difficulty": difficulty,
     }
 
 
 def _make_action(decision="APPROVE", iab="IAB_SAFE", garm="GARM_SAFE",
                  risk="LOW", reasoning="This is a safe post with no harmful content at all.",
-                 confidence=0.9, flagged=None):
+                 confidence=0.9, flagged=None, age_rating="TEEN"):
     return {
         "decision": decision,
         "iab_category": iab,
@@ -24,6 +25,7 @@ def _make_action(decision="APPROVE", iab="IAB_SAFE", garm="GARM_SAFE",
         "risk_level": risk,
         "reasoning": reasoning,
         "confidence": confidence,
+        "age_rating": age_rating,
         "flagged_elements": flagged or [],
     }
 
@@ -34,7 +36,7 @@ class TestPerfectScore:
         action = _make_action(reasoning="A" * 120)
         total, scores, feedback = grade(action, gold)
         assert total > 0.9
-        assert scores["decision"] == 0.35
+        assert scores["decision"] == 0.30
 
     def test_all_correct_hard(self):
         gold = _make_gold(difficulty="hard")
@@ -46,7 +48,7 @@ class TestPerfectScore:
         gold = _make_gold()
         action = _make_action(reasoning="A" * 120, confidence=1.0)
         total, scores, _ = grade(action, gold)
-        assert total == 1.0
+        assert abs(total - 1.0) < 1e-9
 
 
 class TestDecisionScoring:
@@ -54,7 +56,7 @@ class TestDecisionScoring:
         gold = _make_gold(decision="REJECT", iab="IAB_PROFANITY", garm="GARM_OBSCENITY_PROFANITY")
         action = _make_action(decision="REJECT", iab="IAB_PROFANITY", garm="GARM_OBSCENITY_PROFANITY")
         _, scores, _ = grade(action, gold)
-        assert scores["decision"] == 0.35
+        assert scores["decision"] == 0.30
 
     def test_wrong_decision_approve_vs_reject(self):
         gold = _make_gold(decision="REJECT", iab="IAB_PROFANITY", garm="GARM_OBSCENITY_PROFANITY")
@@ -66,26 +68,26 @@ class TestDecisionScoring:
         gold = _make_gold(decision="REJECT", iab="IAB_PROFANITY", garm="GARM_OBSCENITY_PROFANITY")
         action = _make_action(decision="ESCALATE", iab="IAB_PROFANITY", garm="GARM_OBSCENITY_PROFANITY")
         _, scores, _ = grade(action, gold)
-        assert scores["decision"] == round(0.35 * 0.4, 4)
+        assert scores["decision"] == round(0.30 * 0.4, 4)
 
     def test_adjacent_reject_escalate_partial(self):
         gold = _make_gold(decision="ESCALATE")
         action = _make_action(decision="REJECT")
         _, scores, _ = grade(action, gold)
-        assert scores["decision"] == round(0.35 * 0.4, 4)
+        assert scores["decision"] == round(0.30 * 0.4, 4)
 
     def test_adjacent_approve_escalate_partial(self):
         """APPROVE<->ESCALATE now gives partial credit of 0.15."""
         gold = _make_gold(decision="APPROVE")
         action = _make_action(decision="ESCALATE")
         _, scores, _ = grade(action, gold)
-        assert scores["decision"] == round(0.35 * 0.15, 4)
+        assert scores["decision"] == round(0.30 * 0.15, 4)
 
     def test_adjacent_escalate_approve_partial(self):
         gold = _make_gold(decision="ESCALATE")
         action = _make_action(decision="APPROVE")
         _, scores, _ = grade(action, gold)
-        assert scores["decision"] == round(0.35 * 0.15, 4)
+        assert scores["decision"] == round(0.30 * 0.15, 4)
 
     def test_approve_reject_no_credit(self):
         gold = _make_gold(decision="APPROVE")
@@ -105,65 +107,65 @@ class TestCategoryScoring:
         gold = _make_gold(iab="IAB_VIOLENCE", garm="GARM_DEATH_INJURY")
         action = _make_action(iab="IAB_VIOLENCE", garm="GARM_DEATH_INJURY")
         _, scores, _ = grade(action, gold)
-        assert scores["category"] == 0.25
+        assert scores["category"] == 0.20
 
     def test_iab_only_correct(self):
         gold = _make_gold(iab="IAB_VIOLENCE", garm="GARM_DEATH_INJURY")
         action = _make_action(iab="IAB_VIOLENCE", garm="GARM_SAFE")
         _, scores, _ = grade(action, gold)
-        assert scores["category"] == 0.15
+        assert scores["category"] == 0.12
 
     def test_garm_only_correct(self):
         gold = _make_gold(iab="IAB_VIOLENCE", garm="GARM_DEATH_INJURY")
         action = _make_action(iab="IAB_SAFE", garm="GARM_DEATH_INJURY")
         _, scores, _ = grade(action, gold)
-        assert scores["category"] == 0.15
+        assert scores["category"] == 0.12
 
     def test_both_wrong_with_risk_match(self):
         """Both categories wrong but risk matches -> still get risk contribution."""
         gold = _make_gold(iab="IAB_VIOLENCE", garm="GARM_DEATH_INJURY")
         action = _make_action(iab="IAB_SAFE", garm="GARM_SAFE")
         _, scores, _ = grade(action, gold)
-        assert scores["category"] == 0.05
+        assert scores["category"] == 0.04
 
     def test_risk_same_level(self):
         gold = _make_gold(risk="MEDIUM")
         action = _make_action(risk="MEDIUM")
         _, scores, _ = grade(action, gold)
-        assert scores["category"] == 0.25
+        assert scores["category"] == 0.20
 
     def test_risk_one_level_apart(self):
         gold = _make_gold(risk="LOW")
         action = _make_action(risk="MEDIUM")
         _, scores, _ = grade(action, gold)
         # risk_dist=1, risk_score=0.65, cat=0.4+0.4+0.2*0.65=0.93
-        assert scores["category"] == round(0.25 * 0.93, 4)
+        assert scores["category"] == round(0.20 * 0.93, 4)
 
     def test_risk_two_levels_apart(self):
         gold = _make_gold(risk="LOW")
         action = _make_action(risk="HIGH")
         _, scores, _ = grade(action, gold)
         # risk_dist=2, risk_score=0.3, cat=0.4+0.4+0.2*0.3=0.86
-        assert scores["category"] == round(0.25 * 0.86, 4)
+        assert scores["category"] == round(0.20 * 0.86, 4)
 
     def test_risk_three_levels_apart(self):
         gold = _make_gold(risk="LOW")
         action = _make_action(risk="CRITICAL")
         _, scores, _ = grade(action, gold)
         # risk_dist=3, risk_score=0.0, cat=0.4+0.4+0.0=0.8
-        assert scores["category"] == 0.2
+        assert scores["category"] == 0.16
 
     def test_risk_medium_to_high(self):
         gold = _make_gold(risk="MEDIUM")
         action = _make_action(risk="HIGH")
         _, scores, _ = grade(action, gold)
-        assert scores["category"] == round(0.25 * 0.93, 4)
+        assert scores["category"] == round(0.20 * 0.93, 4)
 
     def test_risk_high_to_critical(self):
         gold = _make_gold(risk="HIGH")
         action = _make_action(risk="CRITICAL")
         _, scores, _ = grade(action, gold)
-        assert scores["category"] == round(0.25 * 0.93, 4)
+        assert scores["category"] == round(0.20 * 0.93, 4)
 
     def test_all_wrong_with_risk_mismatch(self):
         gold = _make_gold(iab="IAB_VIOLENCE", garm="GARM_DEATH_INJURY", risk="LOW")
@@ -177,49 +179,49 @@ class TestReasoningScoring:
         gold = _make_gold()
         action = _make_action(reasoning="A" * 120)
         _, scores, _ = grade(action, gold)
-        assert scores["reasoning"] == round(0.20 * 1.0, 4)
+        assert scores["reasoning"] == round(0.18 * 1.0, 4)
 
     def test_200_chars(self):
         gold = _make_gold()
         action = _make_action(reasoning="A" * 200)
         _, scores, _ = grade(action, gold)
-        assert scores["reasoning"] == round(0.20 * 1.0, 4)
+        assert scores["reasoning"] == round(0.18 * 1.0, 4)
 
     def test_119_chars_not_perfect(self):
         gold = _make_gold()
         action = _make_action(reasoning="A" * 119)
         _, scores, _ = grade(action, gold)
-        assert scores["reasoning"] == round(0.20 * 0.75, 4)
+        assert scores["reasoning"] == round(0.18 * 0.75, 4)
 
     def test_80_chars(self):
         gold = _make_gold()
         action = _make_action(reasoning="A" * 80)
         _, scores, _ = grade(action, gold)
-        assert scores["reasoning"] == round(0.20 * 0.75, 4)
+        assert scores["reasoning"] == round(0.18 * 0.75, 4)
 
     def test_79_chars(self):
         gold = _make_gold()
         action = _make_action(reasoning="A" * 79)
         _, scores, _ = grade(action, gold)
-        assert scores["reasoning"] == round(0.20 * 0.5, 4)
+        assert scores["reasoning"] == round(0.18 * 0.5, 4)
 
     def test_40_chars(self):
         gold = _make_gold()
         action = _make_action(reasoning="A" * 40)
         _, scores, _ = grade(action, gold)
-        assert scores["reasoning"] == round(0.20 * 0.5, 4)
+        assert scores["reasoning"] == round(0.18 * 0.5, 4)
 
     def test_39_chars(self):
         gold = _make_gold()
         action = _make_action(reasoning="A" * 39)
         _, scores, _ = grade(action, gold)
-        assert scores["reasoning"] == round(0.20 * 0.25, 4)
+        assert scores["reasoning"] == round(0.18 * 0.25, 4)
 
     def test_10_chars(self):
         gold = _make_gold()
         action = _make_action(reasoning="A" * 10)
         _, scores, _ = grade(action, gold)
-        assert scores["reasoning"] == round(0.20 * 0.25, 4)
+        assert scores["reasoning"] == round(0.18 * 0.25, 4)
 
     def test_9_chars_zero(self):
         gold = _make_gold()
@@ -241,7 +243,7 @@ class TestReasoningScoring:
         )
         _, scores, _ = grade(action, gold)
         # length 0.5 + flagging min(0.3, 0.2) = 0.7
-        assert scores["reasoning"] == round(0.20 * 0.7, 4)
+        assert scores["reasoning"] == round(0.18 * 0.7, 4)
 
     def test_flagged_three_elements(self):
         gold = _make_gold(decision="REJECT", iab="IAB_PROFANITY", garm="GARM_OBSCENITY_PROFANITY")
@@ -251,7 +253,7 @@ class TestReasoningScoring:
         )
         _, scores, _ = grade(action, gold)
         # length 0.5 + flagging min(0.3, 0.3) = 0.8
-        assert scores["reasoning"] == round(0.20 * 0.8, 4)
+        assert scores["reasoning"] == round(0.18 * 0.8, 4)
 
     def test_flagged_four_elements_capped(self):
         gold = _make_gold(decision="REJECT", iab="IAB_PROFANITY", garm="GARM_OBSCENITY_PROFANITY")
@@ -261,38 +263,38 @@ class TestReasoningScoring:
         )
         _, scores, _ = grade(action, gold)
         # length 0.5 + flagging min(0.3, 0.4)=0.3 -> 0.8
-        assert scores["reasoning"] == round(0.20 * 0.8, 4)
+        assert scores["reasoning"] == round(0.18 * 0.8, 4)
 
     def test_flagged_for_approve_no_bonus(self):
         gold = _make_gold(decision="APPROVE")
         action = _make_action(decision="APPROVE", reasoning="A" * 50, flagged=["a", "b"])
         _, scores, _ = grade(action, gold)
-        assert scores["reasoning"] == round(0.20 * 0.5, 4)
+        assert scores["reasoning"] == round(0.18 * 0.5, 4)
 
     def test_specificity_bonus_profanity(self):
         gold = _make_gold()
         action = _make_action(reasoning="This ad contains profanity which is bad for brand safety")
         _, scores, _ = grade(action, gold)
         # len=56 >= 40 -> 0.5, "profanity" keyword -> +0.1 -> 0.6
-        assert scores["reasoning"] == round(0.20 * 0.6, 4)
+        assert scores["reasoning"] == round(0.18 * 0.6, 4)
 
     def test_specificity_bonus_violence(self):
         gold = _make_gold()
         action = _make_action(reasoning="This content depicts violence and should be flagged now")
         _, scores, _ = grade(action, gold)
-        assert scores["reasoning"] == round(0.20 * 0.6, 4)
+        assert scores["reasoning"] == round(0.18 * 0.6, 4)
 
     def test_specificity_bonus_hate(self):
         gold = _make_gold()
         action = _make_action(reasoning="Detected hate speech targeting minorities in this ad")
         _, scores, _ = grade(action, gold)
-        assert scores["reasoning"] == round(0.20 * 0.6, 4)
+        assert scores["reasoning"] == round(0.18 * 0.6, 4)
 
     def test_specificity_no_keywords(self):
         gold = _make_gold()
         action = _make_action(reasoning="A" * 50)
         _, scores, _ = grade(action, gold)
-        assert scores["reasoning"] == round(0.20 * 0.5, 4)
+        assert scores["reasoning"] == round(0.18 * 0.5, 4)
 
     def test_specificity_requires_min_length(self):
         """Specificity bonus requires reasoning_len >= 10."""
@@ -310,7 +312,7 @@ class TestReasoningScoring:
         )
         _, scores, _ = grade(action, gold)
         # len=57 >= 40 -> 0.5, flag 0.1, specificity 0.1 -> 0.7
-        assert scores["reasoning"] == round(0.20 * 0.7, 4)
+        assert scores["reasoning"] == round(0.18 * 0.7, 4)
 
     def test_reasoning_capped_at_one(self):
         gold = _make_gold(decision="REJECT", iab="IAB_PROFANITY", garm="GARM_OBSCENITY_PROFANITY")
@@ -321,7 +323,7 @@ class TestReasoningScoring:
         )
         _, scores, _ = grade(action, gold)
         # 1.0 + 0.3 + 0.1 -> capped at 1.0
-        assert scores["reasoning"] == round(0.20 * 1.0, 4)
+        assert scores["reasoning"] == round(0.18 * 1.0, 4)
 
 
 class TestEfficiencyScoring:
@@ -457,13 +459,13 @@ class TestDifficultyMultiplier:
         gold = _make_gold(difficulty="medium")
         action = _make_action(reasoning="A" * 120)
         total, _, _ = grade(action, gold)
-        assert total == 1.0
+        assert abs(total - 1.0) < 1e-9
 
     def test_hard_1_1_multiplier(self):
         gold = _make_gold(difficulty="hard")
         action = _make_action(reasoning="A" * 120)
         total, _, _ = grade(action, gold)
-        assert total == 1.0
+        assert abs(total - 1.0) < 1e-9
 
     def test_medium_boosts_raw_total(self):
         gold = _make_gold(decision="REJECT", difficulty="medium")
@@ -600,7 +602,7 @@ class TestEdgeCases:
         gold = _make_gold()
         action = _make_action(reasoning="   " + "A" * 40 + "   ")
         _, scores, _ = grade(action, gold)
-        assert scores["reasoning"] == round(0.20 * 0.5, 4)
+        assert scores["reasoning"] == round(0.18 * 0.5, 4)
 
     def test_total_is_capped_at_one(self):
         gold = _make_gold(difficulty="hard")
@@ -619,8 +621,8 @@ class TestEdgeCases:
         action = _make_action(reasoning="A" * 120)
         total, scores, _ = grade(action, gold)
         component_sum = (scores["decision"] + scores["category"] +
-                        scores["reasoning"] + scores["efficiency"] +
-                        scores["calibration"])
+                        scores["reasoning"] + scores["age_rating"] +
+                        scores["efficiency"] + scores["calibration"])
         assert abs(total - component_sum) < 0.001
 
     def test_returns_three_values(self):
@@ -633,7 +635,7 @@ class TestEdgeCases:
         gold = _make_gold()
         action = _make_action()
         _, scores, _ = grade(action, gold)
-        expected_keys = {"decision", "category", "reasoning", "efficiency", "calibration", "total"}
+        expected_keys = {"decision", "category", "reasoning", "age_rating", "efficiency", "calibration", "total"}
         assert set(scores.keys()) == expected_keys
 
 
@@ -651,5 +653,82 @@ class TestIntegration:
         action = _make_action(decision="REJECT", iab="IAB_SAFE", garm="GARM_SAFE",
                              reasoning="A" * 120, confidence=0.5)
         total, scores, _ = grade(action, gold)
-        assert scores["decision"] == round(0.35 * 0.4, 4)
-        assert 0.5 <= total <= 0.6
+        assert scores["decision"] == round(0.30 * 0.4, 4)
+        assert 0.58 <= total <= 0.65
+
+
+class TestAgeRatingScoring:
+    """Test the age_rating scoring component (weight 0.12)."""
+
+    def test_exact_match_all_ages(self):
+        gold = _make_gold(age_rating="ALL_AGES")
+        action = _make_action(age_rating="ALL_AGES")
+        _, scores, _ = grade(action, gold)
+        assert scores["age_rating"] == round(0.12 * 1.0, 4)
+
+    def test_exact_match_teen(self):
+        gold = _make_gold(age_rating="TEEN")
+        action = _make_action(age_rating="TEEN")
+        _, scores, _ = grade(action, gold)
+        assert scores["age_rating"] == round(0.12 * 1.0, 4)
+
+    def test_exact_match_mature(self):
+        gold = _make_gold(age_rating="MATURE")
+        action = _make_action(age_rating="MATURE")
+        _, scores, _ = grade(action, gold)
+        assert scores["age_rating"] == round(0.12 * 1.0, 4)
+
+    def test_exact_match_adult(self):
+        gold = _make_gold(age_rating="ADULT")
+        action = _make_action(age_rating="ADULT")
+        _, scores, _ = grade(action, gold)
+        assert scores["age_rating"] == round(0.12 * 1.0, 4)
+
+    def test_off_by_one_all_ages_vs_teen(self):
+        gold = _make_gold(age_rating="ALL_AGES")
+        action = _make_action(age_rating="TEEN")
+        _, scores, _ = grade(action, gold)
+        assert scores["age_rating"] == round(0.12 * 0.5, 4)
+
+    def test_off_by_one_teen_vs_mature(self):
+        gold = _make_gold(age_rating="TEEN")
+        action = _make_action(age_rating="MATURE")
+        _, scores, _ = grade(action, gold)
+        assert scores["age_rating"] == round(0.12 * 0.5, 4)
+
+    def test_off_by_one_mature_vs_adult(self):
+        gold = _make_gold(age_rating="MATURE")
+        action = _make_action(age_rating="ADULT")
+        _, scores, _ = grade(action, gold)
+        assert scores["age_rating"] == round(0.12 * 0.5, 4)
+
+    def test_off_by_two_all_ages_vs_mature(self):
+        gold = _make_gold(age_rating="ALL_AGES")
+        action = _make_action(age_rating="MATURE")
+        _, scores, _ = grade(action, gold)
+        assert scores["age_rating"] == round(0.12 * 0.15, 4)
+
+    def test_off_by_two_teen_vs_adult(self):
+        gold = _make_gold(age_rating="TEEN")
+        action = _make_action(age_rating="ADULT")
+        _, scores, _ = grade(action, gold)
+        assert scores["age_rating"] == round(0.12 * 0.15, 4)
+
+    def test_off_by_three_all_ages_vs_adult(self):
+        gold = _make_gold(age_rating="ALL_AGES")
+        action = _make_action(age_rating="ADULT")
+        _, scores, _ = grade(action, gold)
+        assert scores["age_rating"] == round(0.12 * 0.0, 4)
+
+    def test_off_by_three_adult_vs_all_ages(self):
+        gold = _make_gold(age_rating="ADULT")
+        action = _make_action(age_rating="ALL_AGES")
+        _, scores, _ = grade(action, gold)
+        assert scores["age_rating"] == round(0.12 * 0.0, 4)
+
+    def test_default_age_rating_is_teen(self):
+        """When age_rating is not specified, defaults produce exact match."""
+        gold = _make_gold()
+        action = _make_action()
+        _, scores, _ = grade(action, gold)
+        assert scores["age_rating"] == round(0.12 * 1.0, 4)

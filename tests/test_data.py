@@ -33,7 +33,7 @@ def test_required_fields_present():
     required = [
         "content_id", "content_text", "content_type", "platform",
         "difficulty", "gold_decision", "gold_iab_category", "gold_garm_category",
-        "gold_risk_level",
+        "gold_risk_level", "gold_age_rating",
     ]
     for item in CONTENT_ITEMS:
         for field in required:
@@ -71,7 +71,7 @@ def test_gold_risk_levels_valid():
 
 
 def test_platforms_valid():
-    valid = {"instagram", "twitter", "youtube", "tiktok", "facebook"}
+    valid = {"instagram", "x", "youtube", "tiktok", "facebook", "reddit", "threads", "linkedin"}
     for item in CONTENT_ITEMS:
         assert item["platform"] in valid, (
             f"{item['content_id']}: unexpected platform '{item['platform']}'"
@@ -79,7 +79,7 @@ def test_platforms_valid():
 
 
 def test_content_types_valid():
-    valid = {"post", "comment", "caption", "bio"}
+    valid = {"post", "comment", "caption", "bio", "reel", "story", "thread"}
     for item in CONTENT_ITEMS:
         assert item["content_type"] in valid, (
             f"{item['content_id']}: unexpected content_type '{item['content_type']}'"
@@ -90,4 +90,12 @@ def test_content_text_not_empty():
     for item in CONTENT_ITEMS:
         assert len(item["content_text"].strip()) > 0, (
             f"{item['content_id']}: empty content_text"
+        )
+
+
+def test_age_ratings_valid():
+    valid_age_ratings = {"ALL_AGES", "TEEN", "MATURE", "ADULT"}
+    for item in CONTENT_ITEMS:
+        assert item["gold_age_rating"] in valid_age_ratings, (
+            f"{item['content_id']}: invalid gold_age_rating '{item['gold_age_rating']}'"
         )

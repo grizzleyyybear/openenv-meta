@@ -101,6 +101,7 @@ class AdReviewEnvironment(Environment):
             action_data = {
                 "decision": "ESCALATE", "iab_category": "IAB_CONTROVERSIAL",
                 "garm_category": "GARM_SAFE", "risk_level": "MEDIUM",
+                "age_rating": "TEEN",
                 "reasoning": "Max steps reached without decision. Auto-escalated.",
                 "confidence": 0.2, "flagged_elements": [],
             }
@@ -108,6 +109,7 @@ class AdReviewEnvironment(Environment):
             action_data = {
                 "decision": action.decision, "iab_category": action.iab_category,
                 "garm_category": action.garm_category, "risk_level": action.risk_level,
+                "age_rating": action.age_rating,
                 "reasoning": action.reasoning, "confidence": action.confidence,
                 "flagged_elements": action.flagged_elements,
             }
@@ -118,12 +120,14 @@ class AdReviewEnvironment(Environment):
         obs = self._make_obs(
             item, final_ctx, step_number=step_num, done=True, reward=total_reward,
             score_decision=scores["decision"], score_category=scores["category"],
-            score_reasoning=scores["reasoning"], score_efficiency=scores["efficiency"],
+            score_reasoning=scores["reasoning"], score_age_rating=scores["age_rating"],
+            score_efficiency=scores["efficiency"],
             score_calibration=scores.get("calibration", 0.0),
             total_score=scores["total"], feedback=feedback,
             gold_decision=item["gold_decision"],
             gold_iab_category=item["gold_iab_category"],
             gold_garm_category=item["gold_garm_category"],
+            gold_age_rating=item.get("gold_age_rating"),
         )
         _shared.clear_item()
         return obs

@@ -21,6 +21,7 @@ GARM_CATEGORIES = [
 VALID_DECISIONS = Literal["APPROVE", "REJECT", "ESCALATE"]
 VALID_RISK_LEVELS = Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"]
 VALID_ACTION_TYPES = Literal["DECIDE", "REQUEST_CONTEXT"]
+VALID_AGE_RATINGS = Literal["ALL_AGES", "TEEN", "MATURE", "ADULT"]
 
 
 class AdReviewAction(Action):
@@ -36,6 +37,7 @@ class AdReviewAction(Action):
         min_length=10, max_length=500,
     )
     confidence: float = Field(default=0.5, ge=0.0, le=1.0)
+    age_rating: VALID_AGE_RATINGS = Field(default="TEEN")
     flagged_elements: List[str] = Field(default_factory=list)
 
     @field_validator("iab_category")
@@ -59,7 +61,7 @@ class AdReviewObservation(Observation):
     content_id: str = Field(description="Unique content item ID")
     content_text: str = Field(description="UGC text to review")
     content_type: str = Field(description="post, comment, caption, or bio")
-    platform: str = Field(description="instagram, tiktok, youtube, twitter")
+    platform: str = Field(description="instagram, tiktok, youtube, x, reddit, threads, linkedin")
     difficulty: str = Field(description="easy, medium, or hard")
 
     step_number: int = Field(default=0)
@@ -71,9 +73,11 @@ class AdReviewObservation(Observation):
     score_reasoning: float = Field(default=0.0)
     score_efficiency: float = Field(default=0.0)
     score_calibration: float = Field(default=0.0)
+    score_age_rating: float = Field(default=0.0)
     total_score: float = Field(default=0.0)
 
     feedback: str = Field(default="")
     gold_decision: Optional[str] = Field(default=None)
     gold_iab_category: Optional[str] = Field(default=None)
     gold_garm_category: Optional[str] = Field(default=None)
+    gold_age_rating: Optional[str] = Field(default=None)

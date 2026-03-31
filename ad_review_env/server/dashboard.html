@@ -117,7 +117,7 @@
       </div>
       <div class="form-group">
         <label>Platform</label>
-        <select id="analyzePlatform"><option value="social_media">Social Media</option><option value="tiktok">TikTok</option><option value="instagram">Instagram</option><option value="twitter">Twitter</option><option value="youtube">YouTube</option><option value="reddit">Reddit</option><option value="forum">Forum</option></select>
+        <select id="analyzePlatform"><option value="social_media">Social Media</option><option value="tiktok">TikTok</option><option value="instagram">Instagram</option><option value="x">X</option><option value="youtube">YouTube</option><option value="reddit">Reddit</option><option value="threads">Threads</option><option value="linkedin">LinkedIn</option></select>
       </div>
       <div class="full"><button id="btnAnalyze" onclick="analyzeContent()">Analyze</button></div>
     </div>
@@ -179,6 +179,10 @@
         <input id="gradeConf" type="number" min="0" max="1" step="0.05" value="0.8">
       </div>
       <div class="form-group">
+        <label>Age Rating</label>
+        <select id="gradeAge"><option value="ALL_AGES">ALL_AGES</option><option value="TEEN" selected>TEEN</option><option value="MATURE">MATURE</option><option value="ADULT">ADULT</option></select>
+      </div>
+      <div class="form-group">
         <label>Flagged Elements (comma-separated)</label>
         <input id="gradeFlagged" type="text" placeholder="e.g. kill, f***, scam">
       </div>
@@ -227,9 +231,12 @@ async function analyzeContent() {
     const flaggedHtml = a.flagged_elements.length > 0
       ? a.flagged_elements.map(f => `<code style="background:var(--border);padding:0.1rem 0.3rem;border-radius:3px;font-size:0.75rem;">${esc(f)}</code>`).join(' ')
       : '<span style="color:var(--muted);">none</span>';
+    const ageColors = { ALL_AGES: 'var(--green)', TEEN: 'var(--accent)', MATURE: '#f97316', ADULT: 'var(--red)' };
+    const ageColor = ageColors[a.age_rating] || 'var(--text)';
     el('analyzeOutput').innerHTML = `
       <div class="grade-row"><span class="grade-label">Decision</span><span class="badge badge-${decClass}" style="font-size:0.82rem;">${a.decision}</span></div>
       <div class="grade-row"><span class="grade-label">Risk Level</span><span class="grade-val" style="color:${riskColor};">${a.risk_level}</span></div>
+      <div class="grade-row"><span class="grade-label">Age Rating</span><span class="grade-val" style="color:${ageColor};">${a.age_rating || 'N/A'}</span></div>
       <div class="grade-row"><span class="grade-label">IAB Category</span><span class="grade-val">${a.iab_category}</span></div>
       <div class="grade-row"><span class="grade-label">GARM Category</span><span class="grade-val">${a.garm_category}</span></div>
       <div class="grade-row"><span class="grade-label">Confidence</span><span class="grade-val">${(a.confidence * 100).toFixed(0)}%</span></div>
@@ -351,6 +358,7 @@ async function submitGrade() {
     iab_category: el('gradeIAB').value,
     garm_category: el('gradeGARM').value,
     risk_level: el('gradeRisk').value,
+    age_rating: el('gradeAge').value,
     reasoning: reasoning,
     confidence: parseFloat(el('gradeConf').value) || 0.5,
     flagged_elements: flagged,
@@ -380,9 +388,10 @@ async function submitGrade() {
       <div class="grade-row"><span class="grade-label">Gold decision</span><span class="badge badge-${data.gold_decision.toLowerCase()}">${data.gold_decision}</span></div>
       <div class="grade-row"><span class="grade-label">Verdict</span><span class="grade-val ${matchClass}">${matchText}</span></div>
       <div style="height:8px;"></div>
-      <div class="grade-row"><span class="grade-label">Decision (40%)</span><span class="grade-val">${scores.decision.toFixed(3)}</span></div>
-      <div class="grade-row"><span class="grade-label">Category (30%)</span><span class="grade-val">${scores.category.toFixed(3)}</span></div>
-      <div class="grade-row"><span class="grade-label">Reasoning (20%)</span><span class="grade-val">${scores.reasoning.toFixed(3)}</span></div>
+      <div class="grade-row"><span class="grade-label">Decision (30%)</span><span class="grade-val">${scores.decision.toFixed(3)}</span></div>
+      <div class="grade-row"><span class="grade-label">Category (20%)</span><span class="grade-val">${scores.category.toFixed(3)}</span></div>
+      <div class="grade-row"><span class="grade-label">Reasoning (18%)</span><span class="grade-val">${scores.reasoning.toFixed(3)}</span></div>
+      <div class="grade-row"><span class="grade-label">Age Rating (12%)</span><span class="grade-val">${scores.age_rating ? scores.age_rating.toFixed(3) : '0.000'}</span></div>
       <div class="grade-row"><span class="grade-label">Efficiency (10%)</span><span class="grade-val">${scores.efficiency.toFixed(3)}</span></div>
       <div style="height:4px;"></div>
       <div class="grade-row" style="border-top:1px solid var(--border);padding-top:0.5rem;"><span class="grade-label" style="font-weight:600;">Total</span><span class="grade-val" style="font-size:1.1rem;color:var(--accent);">${data.total_reward.toFixed(4)}</span></div>

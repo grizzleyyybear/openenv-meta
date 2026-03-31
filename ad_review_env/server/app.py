@@ -73,17 +73,17 @@ def baseline_agent(text: str, content_type: str = "", platform: str = "") -> Dic
     flagged = [kw for kw in _CRITICAL_KW + _REJECT_KW + _ESCALATE_KW if kw in text_lower]
 
     if any(kw in text_lower for kw in _CRITICAL_KW):
-        decision, iab, garm, risk, confidence = (
-            "REJECT", "IAB_HATE_SPEECH", "GARM_HATE_SPEECH", "CRITICAL", 0.9)
+        decision, iab, garm, risk, confidence, age = (
+            "REJECT", "IAB_HATE_SPEECH", "GARM_HATE_SPEECH", "CRITICAL", 0.9, "ADULT")
     elif any(kw in text_lower for kw in _REJECT_KW):
-        decision, iab, garm, risk, confidence = (
-            "REJECT", "IAB_PROFANITY", "GARM_OBSCENITY_PROFANITY", "HIGH", 0.75)
+        decision, iab, garm, risk, confidence, age = (
+            "REJECT", "IAB_PROFANITY", "GARM_OBSCENITY_PROFANITY", "HIGH", 0.75, "MATURE")
     elif any(kw in text_lower for kw in _ESCALATE_KW):
-        decision, iab, garm, risk, confidence = (
-            "ESCALATE", "IAB_CONTROVERSIAL", "GARM_SAFE", "MEDIUM", 0.6)
+        decision, iab, garm, risk, confidence, age = (
+            "ESCALATE", "IAB_CONTROVERSIAL", "GARM_SAFE", "MEDIUM", 0.6, "TEEN")
     else:
-        decision, iab, garm, risk, confidence = (
-            "APPROVE", "IAB_SAFE", "GARM_SAFE", "LOW", 0.8)
+        decision, iab, garm, risk, confidence, age = (
+            "APPROVE", "IAB_SAFE", "GARM_SAFE", "LOW", 0.8, "ALL_AGES")
 
     reasoning = (
         f"Keyword scan: {'flagged ' + str(flagged[:3]) if flagged else 'no red-flag keywords'}. "
@@ -91,8 +91,8 @@ def baseline_agent(text: str, content_type: str = "", platform: str = "") -> Dic
     )
     return {
         "decision": decision, "iab_category": iab, "garm_category": garm,
-        "risk_level": risk, "reasoning": reasoning, "confidence": confidence,
-        "flagged_elements": flagged[:5],
+        "risk_level": risk, "age_rating": age, "reasoning": reasoning,
+        "confidence": confidence, "flagged_elements": flagged[:5],
     }
 
 
@@ -113,6 +113,7 @@ class GraderRequest(BaseModel):
     iab_category: str = Field(...)
     garm_category: str = Field(...)
     risk_level: str = Field(...)
+    age_rating: str = Field(default="TEEN")
     reasoning: str = Field(..., min_length=10, max_length=500)
     confidence: float = Field(..., ge=0.0, le=1.0)
     flagged_elements: List[str] = Field(default_factory=list)
@@ -149,8 +150,8 @@ _AGENTS = {"smart": smart_agent, "baseline": baseline_agent}
 
 class AnalyzeRequest(BaseModel):
     content_text: str = Field(..., min_length=1, max_length=5000)
-    content_type: str = Field(default="post", pattern=r"^(post|comment|caption|bio)$")
-    platform: str = Field(default="social_media", pattern=r"^(instagram|tiktok|youtube|twitter|facebook|social_media)$")
+    content_type: str = Field(default="post", pattern=r"^(post|comment|caption|bio|reel|story|thread)$")
+    platform: str = Field(default="social_media", pattern=r"^(instagram|tiktok|youtube|x|facebook|reddit|threads|linkedin|social_media)$")
 
 
 @app.post("/analyze", tags=["Hackathon"])

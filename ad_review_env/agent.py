@@ -65,6 +65,7 @@ class Classification:
     iab_category: str = "IAB_SAFE"
     garm_category: str = "GARM_SAFE"
     risk_level: str = "LOW"
+    age_rating: str = "ALL_AGES"
     confidence: float = 0.85
     reasoning_parts: List[str] = field(default_factory=list)
 
@@ -314,48 +315,53 @@ def _text_matches(text: str, pattern: str) -> bool:
 def _set(
     c: Classification,
     decision: str, iab: str, garm: str, risk: str, confidence: float,
-    reason: str,
+    reason: str, age_rating: str = "TEEN",
 ) -> Classification:
     c.decision = decision
     c.iab_category = iab
     c.garm_category = garm
     c.risk_level = risk
+    c.age_rating = age_rating
     c.confidence = confidence
     c.reasoning_parts = [reason]
     return c
 
 
 def _classify_critical(signals: SignalMap, c: Classification) -> Classification:
-    if signals.hate_speech.strength >= 0.7 or signals.terrorism.strength >= 0.7:
+    if signals.hate_speech.strength >= 0.7:
         garm = "GARM_TERRORISM" if signals.terrorism.strength >= 0.9 else "GARM_HATE_SPEECH"
         return _set(c, "REJECT", "IAB_HATE_SPEECH", garm, "CRITICAL", 0.95,
-                    "Critical: hate speech / extremist content detected")
+                    "Critical: hate speech / extremist content detected", "ADULT")
+    if signals.terrorism.strength >= 0.7:
+        age = "ADULT" if signals.hate_speech.strength >= 0.5 else "MATURE"
+        return _set(c, "REJECT", "IAB_VIOLENCE", "GARM_DEATH_INJURY", "CRITICAL", 0.9,
+                    "Critical: violent/threatening content detected", age)
     return _set(c, "REJECT", "IAB_VIOLENCE", "GARM_DEATH_INJURY", "CRITICAL", 0.9,
-                "Critical: violent/threatening content detected")
+                "Critical: violent/threatening content detected", "MATURE")
 
 
 def _classify_illegal(signals: SignalMap, c: Classification) -> Classification:
     if signals.piracy.strength >= 0.7:
         return _set(c, "REJECT", "IAB_ILLEGAL", "GARM_ONLINE_PIRACY", "HIGH", 0.88,
-                    "Copyright piracy / illegal distribution detected")
+                    "Copyright piracy / illegal distribution detected", "ADULT")
     return _set(c, "REJECT", "IAB_ILLEGAL", "GARM_CRIME_HARMFUL", "CRITICAL", 0.92,
-                "Illegal activity promotion detected (drug sales / unlicensed substances)")
+                "Illegal activity promotion detected (drug sales / unlicensed substances)", "ADULT")
 
 
 def _classify_severe_misinfo(text: str, c: Classification) -> Classification:
     if _text_matches(text, r"\b(cancer\s*cure|instead\s*of\s*chemo)\b"):
         return _set(c, "REJECT", "IAB_MISINFORMATION", "GARM_SPAM_HARMFUL", "CRITICAL", 0.9,
-                    "Dangerous medical misinformation: promoting unproven alternatives to standard treatment")
+                    "Dangerous medical misinformation: promoting unproven alternatives to standard treatment", "TEEN")
     return _set(c, "REJECT", "IAB_MISINFORMATION", "GARM_SPAM_HARMFUL", "MEDIUM", 0.78,
-                "Misinformation / conspiracy content detected")
+                "Misinformation / conspiracy content detected", "TEEN")
 
 
 def _classify_profanity(signals: SignalMap, c: Classification) -> Classification:
     if signals.critical.strength >= 0.4:
         return _set(c, "REJECT", "IAB_PROFANITY", "GARM_OBSCENITY_PROFANITY", "HIGH", 0.85,
-                    "Profanity combined with violent language detected")
+                    "Profanity combined with violent language detected", "MATURE")
     return _set(c, "REJECT", "IAB_PROFANITY", "GARM_OBSCENITY_PROFANITY", "HIGH", 0.8,
-                "Explicit profanity detected")
+                "Explicit profanity detected", "MATURE")
 
 
 def _classify_drugs(text: str, ctx: ContentContext, c: Classification) -> Classification:
@@ -364,41 +370,41 @@ def _classify_drugs(text: str, ctx: ContentContext, c: Classification) -> Classi
     has_redemption = _text_matches(text, r"\b(redemption|can\s*change|legit|years?\s*clean)\b")
     if is_cbd:
         return _set(c, "ESCALATE", "IAB_DRUGS", "GARM_SAFE", "MEDIUM", 0.6,
-                    "CBD/hemp product discussion — legal but brand-dependent sensitivity, needs review")
+                    "CBD/hemp product discussion — legal but brand-dependent sensitivity, needs review", "TEEN")
     if ctx.is_personal_narrative or has_health_framing or has_redemption:
         return _set(c, "ESCALATE", "IAB_DRUGS", "GARM_CRIME_HARMFUL", "MEDIUM", 0.65,
-                    "Substance discussion in personal health/redemption context — needs human review")
+                    "Substance discussion in personal health/redemption context — needs human review", "TEEN")
     return _set(c, "REJECT", "IAB_DRUGS", "GARM_CRIME_HARMFUL", "HIGH", 0.8,
-                "Drug/substance promotion detected")
+                "Drug/substance promotion detected", "MATURE")
 
 
 def _classify_controversial(text: str, ctx: ContentContext, c: Classification) -> Classification:
     if ctx.is_advocacy:
         return _set(c, "ESCALATE", "IAB_CONTROVERSIAL", "GARM_DEATH_INJURY", "MEDIUM", 0.6,
-                    "Advocacy on divisive topic from personal/professional perspective — needs brand alignment check")
+                    "Advocacy on divisive topic from personal/professional perspective — needs brand alignment check", "TEEN")
     if _text_matches(text, r"\b(leaked|documents?|internal)\b"):
         return _set(c, "ESCALATE", "IAB_CONTROVERSIAL", "GARM_SPAM_HARMFUL", "HIGH", 0.65,
-                    "Potential defamation/leak content — escalate for legal review")
+                    "Potential defamation/leak content — escalate for legal review", "TEEN")
     if _text_matches(text, r"\bcrypto\b"):
         return _set(c, "ESCALATE", "IAB_CONTROVERSIAL", "GARM_SAFE", "MEDIUM", 0.6,
-                    "Crypto promotion to potentially young audience — financial risk, escalate")
+                    "Crypto promotion to potentially young audience — financial risk, escalate", "TEEN")
     if _text_matches(text, r"\bmeme\b") and _text_matches(text, r"#politics|political"):
         return _set(c, "ESCALATE", "IAB_CONTROVERSIAL", "GARM_SAFE", "MEDIUM", 0.6,
-                    "Political humor/meme content — brand-sensitivity varies by advertiser, escalate")
+                    "Political humor/meme content — brand-sensitivity varies by advertiser, escalate", "TEEN")
     if _text_matches(text, r"\b(israeli|palestinian|israel|palestine)\b"):
         return _set(c, "ESCALATE", "IAB_CONTROVERSIAL", "GARM_SAFE", "MEDIUM", 0.6,
-                    "Content touches sensitive geopolitical topic — needs brand alignment check")
+                    "Content touches sensitive geopolitical topic — needs brand alignment check", "TEEN")
     if _text_matches(text, r"\b(politician|democracy|abortion)\b"):
         is_abortion = _text_matches(text, r"\babortion\b")
         garm = "GARM_HATE_SPEECH" if is_abortion else "GARM_SPAM_HARMFUL"
         risk = "HIGH" if is_abortion else "MEDIUM"
         return _set(c, "REJECT", "IAB_CONTROVERSIAL", garm, risk, 0.75,
-                    "Politically divisive content — brand risk regardless of viewpoint")
+                    "Politically divisive content — brand risk regardless of viewpoint", "TEEN")
     return _set(c, "REJECT", "IAB_CONTROVERSIAL", "GARM_SPAM_HARMFUL", "MEDIUM", 0.7,
-                "Controversial content detected — brand risk")
+                "Controversial content detected — brand risk", "TEEN")
 
 
-def _classify_safe(signals: SignalMap, ctx: ContentContext, c: Classification) -> Classification:
+def _classify_safe(text: str, signals: SignalMap, ctx: ContentContext, c: Classification) -> Classification:
     if ctx.is_satire:
         reason = "Content identified as satire/humor with no harmful elements"
     elif ctx.is_personal_narrative and signals.safe.strength >= 0.3:
@@ -408,7 +414,28 @@ def _classify_safe(signals: SignalMap, ctx: ContentContext, c: Classification) -
     else:
         reason = "No harmful signals detected in content"
         c.confidence = 0.75
-    return _set(c, "APPROVE", "IAB_SAFE", "GARM_SAFE", "LOW", c.confidence, reason)
+    age = _safe_age_rating(text)
+    return _set(c, "APPROVE", "IAB_SAFE", "GARM_SAFE", "LOW", c.confidence, reason, age)
+
+
+_TEEN_THEME_PATTERNS = [
+    r"\b(wine|beer|IPA|bourbon|whiskey|vodka|cocktail|chianti|brewery|craft\s*beer)\b",
+    r"🍷|🍺|🥃|🍸",
+    r"\b(WWII|World\s*War|fought\s*in|war\b|combat|veteran)\b",
+    r"\b(PTSD|self[- ]?harm|crisis\s*line|988|suicid|years?\s*clean)\b",
+    r"\b(Afghanistan|Iraq|deployment|came\s*home\s*from)\b",
+    r"\b(true\s*crime|murder\s*mystery|serial\s*killer|cold\s*case)\b",
+    r"\b(Aleppo|war\s*photo|haunts\s*me|rubble|bomb)\b",
+    r"\b(tw\s*//|trigger\s*warning|content\s*warning)\b",
+    r"\bnever\s*again\b",
+]
+
+
+def _safe_age_rating(text: str) -> str:
+    for pat in _TEEN_THEME_PATTERNS:
+        if re.search(pat, text, re.IGNORECASE):
+            return "TEEN"
+    return "ALL_AGES"
 
 
 def classify_content(text: str, signals: SignalMap, context: ContentContext) -> Classification:
@@ -417,17 +444,18 @@ def classify_content(text: str, signals: SignalMap, context: ContentContext) -> 
     if signals.critical.strength >= 0.8 and not context.is_satire:
         return _classify_critical(signals, c)
     if signals.terrorism.strength >= 0.8:
+        age = "ADULT" if signals.hate_speech.strength >= 0.6 else "MATURE"
         return _set(c, "REJECT", "IAB_HATE_SPEECH", "GARM_TERRORISM", "CRITICAL", 0.93,
-                    "Extremist group recruitment / terrorism content detected")
+                    "Extremist group recruitment / terrorism content detected", age)
     if signals.adult.strength >= 0.7:
         return _set(c, "REJECT", "IAB_ADULT", "GARM_ADULT_EXPLICIT", "CRITICAL", 0.92,
-                    "Adult/explicit content promotion detected")
+                    "Adult/explicit content promotion detected", "ADULT")
     if signals.violence.strength >= 0.7:
         return _set(c, "REJECT", "IAB_VIOLENCE", "GARM_DEATH_INJURY", "HIGH", 0.88,
-                    "Graphic violence content detected")
+                    "Graphic violence content detected", "MATURE")
     if signals.hate_speech.strength >= 0.6 and not context.is_personal_narrative:
         return _set(c, "REJECT", "IAB_HATE_SPEECH", "GARM_HATE_SPEECH", "HIGH", 0.85,
-                    "Hate speech / discriminatory content detected")
+                    "Hate speech / discriminatory content detected", "ADULT")
     if signals.illegal.strength >= 0.7:
         return _classify_illegal(signals, c)
     if signals.misinformation.strength >= 0.75:
@@ -436,28 +464,28 @@ def classify_content(text: str, signals: SignalMap, context: ContentContext) -> 
         return _classify_profanity(signals, c)
     if signals.piracy.strength >= 0.6:
         return _set(c, "REJECT", "IAB_ILLEGAL", "GARM_ONLINE_PIRACY", "HIGH", 0.82,
-                    "Copyright piracy content detected")
+                    "Copyright piracy content detected", "ADULT")
     if signals.drugs.strength >= 0.5:
         return _classify_drugs(text, context, c)
     if signals.gambling.strength >= 0.5:
         if signals.gambling.strength >= 0.8:
             return _set(c, "REJECT", "IAB_GAMBLING", "GARM_CRIME_HARMFUL", "HIGH", 0.85,
-                        "Gambling promotion / affiliate content detected")
+                        "Gambling promotion / affiliate content detected", "TEEN")
         return _set(c, "ESCALATE", "IAB_GAMBLING", "GARM_SAFE", "MEDIUM", 0.6,
-                    "Gambling content — brand suitability varies, needs human review")
+                    "Gambling content — brand suitability varies, needs human review", "TEEN")
     if signals.controversial.strength >= 0.5:
         return _classify_controversial(text, context, c)
     if signals.misinformation.strength >= 0.5:
         return _set(c, "REJECT", "IAB_MISINFORMATION", "GARM_SPAM_HARMFUL", "MEDIUM", 0.75,
-                    "Health misinformation / predatory marketing pattern detected")
+                    "Health misinformation / predatory marketing pattern detected", "TEEN")
     # Safety net: any remaining critical/violence signals should never pass as safe
     if signals.critical.strength >= 0.5 and not context.is_satire:
         return _set(c, "REJECT", "IAB_VIOLENCE", "GARM_DEATH_INJURY", "HIGH", 0.8,
-                    "Violent/threatening language detected")
+                    "Violent/threatening language detected", "MATURE")
     if signals.violence.strength >= 0.4 and not context.is_satire:
         return _set(c, "ESCALATE", "IAB_VIOLENCE", "GARM_DEATH_INJURY", "MEDIUM", 0.65,
-                    "Potentially violent content — needs human review")
-    return _classify_safe(signals, context, c)
+                    "Potentially violent content — needs human review", "MATURE")
+    return _classify_safe(text, signals, context, c)
 
 
 def build_reasoning(
@@ -494,6 +522,7 @@ def build_review_action(classification: Classification, reasoning: str, signals:
         "iab_category": classification.iab_category,
         "garm_category": classification.garm_category,
         "risk_level": classification.risk_level,
+        "age_rating": classification.age_rating,
         "reasoning": reasoning,
         "confidence": round(classification.confidence, 2),
         "flagged_elements": signals.all_flagged,
