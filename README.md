@@ -62,7 +62,7 @@ Each item has gold labels, context layers, and deterministic grading.
 **Observation** (`AdReviewObservation`):
 - Content fields: `content_id`, `content_text`, `content_type`, `platform`, `difficulty`
 - Episode state: `step_number`, `max_steps`, `additional_context`
-- Scoring: `score_decision`, `score_category`, `score_reasoning`, `score_efficiency`, `total_score`
+- Scoring: `score_decision`, `score_category`, `score_reasoning`, `score_efficiency`, `score_calibration`, `total_score`
 - Feedback: `feedback`, `gold_decision`, `gold_iab_category`, `gold_garm_category`
 
 ## Quick Start
@@ -112,7 +112,7 @@ pip install openai requests
 python inference.py
 ```
 
-The script fetches tasks, calls the LLM for each, grades via `/grader`, and reports scores.
+The script runs episodes via the standard `POST /reset` → `POST /step` loop, calling the LLM for each decision.
 
 ## Baseline Scores
 
@@ -128,7 +128,7 @@ The script fetches tasks, calls the LLM for each, grades via `/grader`, and repo
 python -m pytest tests/ -v
 ```
 
-83 tests covering data integrity, grader logic, agent decisions, model validation, and multi-step episodes.
+141 tests covering data integrity, grader logic (5 components + calibration), agent decisions, model validation, edge cases, and multi-step episodes.
 
 ## Project Structure
 
