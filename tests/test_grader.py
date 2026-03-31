@@ -4,7 +4,7 @@ from ad_review_env.grader import grade
 
 
 def _make_gold(decision="APPROVE", iab="IAB_SAFE", garm="GARM_SAFE",
-               risk="LOW", difficulty="easy", age_rating="TEEN"):
+               risk="LOW", difficulty="easy", age_rating="TEEN", platform=""):
     return {
         "gold_decision": decision,
         "gold_iab_category": iab,
@@ -12,6 +12,7 @@ def _make_gold(decision="APPROVE", iab="IAB_SAFE", garm="GARM_SAFE",
         "gold_risk_level": risk,
         "gold_age_rating": age_rating,
         "difficulty": difficulty,
+        "platform": platform,
     }
 
 
@@ -609,6 +610,256 @@ class TestEdgeCases:
         action = _make_action(reasoning="A" * 120, confidence=1.0)
         total, _, _ = grade(action, gold)
         assert total <= 1.0
+
+
+class TestPlatformAwareWeights:
+    """Test that platform changes component weights."""
+
+    def test_tiktok_higher_age_weight(self):
+        """TikTok gives age_rating 0.18 weight vs default 0.12."""
+        gold = _make_gold(platform="tiktok")
+        action = _make_action(age_rating="TEEN")  # matches default gold
+        _, scores, _ = grade(action, gold)
+        # TikTok age weight = 0.18
+        assert scores["age_rating"] == round(0.18 * 1.0, 4)
+
+    def test_linkedin_higher_reasoning_weight(self):
+        """LinkedIn gives reasoning 0.22 weight vs default 0.18."""
+        gold = _make_gold(platform="linkedin")
+        action = _make_action(reasoning="A" * 120)
+        _, scores, _ = grade(action, gold)
+        assert scores["reasoning"] == round(0.22 * 1.0, 4)
+
+    def test_reddit_higher_reasoning_weight(self):
+        gold = _make_gold(platform="reddit")
+        action = _make_action(reasoning="A" * 120)
+        _, scores, _ = grade(action, gold)
+        assert scores["reasoning"] == round(0.22 * 1.0, 4)
+
+    def test_x_higher_efficiency_weight(self):
+        """X gives efficiency 0.14 weight vs default 0.10."""
+        gold = _make_gold(platform="x")
+        action = _make_action()
+        _, scores, _ = grade(action, gold, steps_taken=1)
+        assert scores["efficiency"] == round(0.14 * 1.0, 4)
+
+    def test_no_platform_uses_default(self):
+        gold = _make_gold()
+        action = _make_action(reasoning="A" * 120)
+        _, scores, _ = grade(action, gold)
+        assert scores["decision"] == round(0.30 * 1.0, 4)
+
+    def test_unknown_platform_uses_default(self):
+        gold = _make_gold(platform="myspace")
+        action = _make_action(reasoning="A" * 120)
+        _, scores, _ = grade(action, gold)
+        assert scores["decision"] == round(0.30 * 1.0, 4)
+
+    def test_tiktok_vs_default_different_totals(self):
+        """Same action on different platforms should give different scores."""
+        gold_default = _make_gold()
+        gold_tiktok = _make_gold(platform="tiktok")
+        action = _make_action(reasoning="A" * 120)
+        t1, _, _ = grade(action, gold_default)
+        t2, _, _ = grade(action, gold_tiktok)
+        # They should differ since weights are different
+        assert t1 != t2
+
+    def test_tiktok_approve_harmful_extra_penalty(self):
+        """Approving REJECT content on TikTok gets extra decision penalty."""
+        gold_tiktok = _make_gold(decision="REJECT", iab="IAB_VIOLENCE", garm="GARM_DEATH_INJURY", platform="tiktok")
+        gold_default = _make_gold(decision="REJECT", iab="IAB_VIOLENCE", garm="GARM_DEATH_INJURY")
+        action = _make_action(decision="APPROVE", iab="IAB_VIOLENCE", garm="GARM_DEATH_INJURY")
+        _, scores_tiktok, _ = grade(action, gold_tiktok)
+        _, scores_default, _ = grade(action, gold_default)
+        # TikTok penalty makes it worse (APPROVE->REJECT is already 0)
+        assert scores_tiktok["decision"] <= scores_default["decision"]
+
+    def test_platform_age_strictness_tiktok_underrate(self):
+        """Under-rating age on TikTok is penalized more heavily."""
+        gold_tiktok = _make_gold(age_rating="MATURE", platform="tiktok")
+        gold_default = _make_gold(age_rating="MATURE")
+        action = _make_action(age_rating="ALL_AGES")  # under-rated by 2 levels
+        _, scores_tiktok, _ = grade(action, gold_tiktok)
+        _, scores_default, _ = grade(action, gold_default)
+        assert scores_tiktok["age_rating"] < scores_default["age_rating"]
+
+    def test_reddit_age_more_permissive(self):
+        """Reddit is more permissive on age under-rating."""
+        gold_reddit = _make_gold(age_rating="MATURE", platform="reddit")
+        gold_default = _make_gold(age_rating="MATURE")
+        action = _make_action(age_rating="TEEN")  # under-rated by 1
+        _, scores_reddit, _ = grade(action, gold_reddit)
+        _, scores_default, _ = grade(action, gold_default)
+        # Reddit (strictness=0.7) should be more permissive than default (1.0)
+        assert scores_reddit["age_rating"] >= scores_default["age_rating"]
+
+    def test_feedback_includes_platform(self):
+        gold = _make_gold(platform="tiktok")
+        action = _make_action()
+        _, _, feedback = grade(action, gold)
+        assert "tiktok" in feedback.lower()
+
+
+class TestExtensiveEdgeCases:
+    """Comprehensive edge cases for grader robustness."""
+
+    def test_none_decision(self):
+        gold = _make_gold()
+        action = {"decision": None, "iab_category": "IAB_SAFE", "garm_category": "GARM_SAFE",
+                  "risk_level": "LOW", "reasoning": "A" * 120, "confidence": 0.9}
+        total, _, _ = grade(action, gold)
+        assert 0.0 <= total <= 1.0
+
+    def test_none_confidence(self):
+        gold = _make_gold()
+        action = _make_action(confidence=None)
+        # confidence=None -> _safe_float returns 0.5
+        total, scores, _ = grade(action, gold)
+        assert scores["calibration"] == round(0.10 * 0.5, 4)
+
+    def test_string_confidence(self):
+        gold = _make_gold()
+        action = _make_action()
+        action["confidence"] = "not_a_number"
+        total, scores, _ = grade(action, gold)
+        assert scores["calibration"] == round(0.10 * 0.5, 4)
+
+    def test_negative_steps_clamped(self):
+        gold = _make_gold()
+        action = _make_action()
+        _, scores, _ = grade(action, gold, steps_taken=-5)
+        assert scores["efficiency"] == round(0.10 * 1.0, 4)
+
+    def test_zero_steps_clamped(self):
+        gold = _make_gold()
+        action = _make_action()
+        _, scores, _ = grade(action, gold, steps_taken=0)
+        assert scores["efficiency"] == round(0.10 * 1.0, 4)
+
+    def test_huge_steps_clamped(self):
+        gold = _make_gold()
+        action = _make_action()
+        _, scores, _ = grade(action, gold, steps_taken=100)
+        assert scores["efficiency"] == round(0.10 * 0.4, 4)
+
+    def test_unicode_reasoning(self):
+        gold = _make_gold()
+        action = _make_action(reasoning="This content contains 🔞 emoji and violent threats 💀🔪 and should be flagged immediately")
+        total, _, _ = grade(action, gold)
+        assert 0.0 <= total <= 1.0
+
+    def test_unicode_decision(self):
+        gold = _make_gold()
+        action = _make_action(decision="ÀPPROVE")  # accent char
+        total, scores, _ = grade(action, gold)
+        assert scores["decision"] == 0.0  # doesn't match
+
+    def test_empty_gold_risk(self):
+        gold = _make_gold()
+        del gold["gold_risk_level"]
+        action = _make_action()
+        total, _, _ = grade(action, gold)
+        assert 0.0 <= total <= 1.0
+
+    def test_empty_gold_age(self):
+        gold = _make_gold()
+        del gold["gold_age_rating"]
+        action = _make_action()
+        total, _, _ = grade(action, gold)
+        assert 0.0 <= total <= 1.0
+
+    def test_all_none_action_fields(self):
+        gold = _make_gold()
+        action = {}
+        total, _, feedback = grade(action, gold)
+        assert 0.0 <= total <= 1.0
+        assert isinstance(feedback, str)
+
+    def test_very_long_reasoning(self):
+        gold = _make_gold()
+        action = _make_action(reasoning="A" * 5000)
+        total, scores, _ = grade(action, gold)
+        assert scores["reasoning"] == round(0.18 * 1.0, 4)
+
+    def test_newlines_in_reasoning(self):
+        gold = _make_gold()
+        action = _make_action(reasoning="Line 1 about profanity\nLine 2 about violence\nLine 3 about more stuff padding")
+        total, _, _ = grade(action, gold)
+        assert 0.0 <= total <= 1.0
+
+    def test_flagged_elements_huge_list(self):
+        gold = _make_gold(decision="REJECT", iab="IAB_PROFANITY", garm="GARM_OBSCENITY_PROFANITY")
+        action = _make_action(decision="REJECT", iab="IAB_PROFANITY", garm="GARM_OBSCENITY_PROFANITY",
+                             reasoning="A" * 120, flagged=["word"] * 100)
+        _, scores, _ = grade(action, gold)
+        # flagging bonus capped at 0.3
+        assert scores["reasoning"] == round(0.18 * 1.0, 4)
+
+    def test_unknown_risk_level(self):
+        gold = _make_gold(risk="UNKNOWN_RISK")
+        action = _make_action(risk="ALSO_UNKNOWN")
+        total, _, _ = grade(action, gold)
+        assert 0.0 <= total <= 1.0
+
+    def test_unknown_age_rating(self):
+        gold = _make_gold(age_rating="UNKNOWN_AGE")
+        action = _make_action(age_rating="ALSO_UNKNOWN")
+        total, _, _ = grade(action, gold)
+        assert 0.0 <= total <= 1.0
+
+    def test_case_sensitive_decision(self):
+        gold = _make_gold(decision="REJECT")
+        action = _make_action(decision="reject")  # lowercase
+        _, scores, _ = grade(action, gold)
+        assert scores["decision"] == 0.0
+
+    def test_whitespace_in_platform(self):
+        gold = _make_gold(platform="  tiktok  ")
+        action = _make_action()
+        _, scores, _ = grade(action, gold)
+        # Should still use tiktok weights after strip()
+        assert scores["age_rating"] == round(0.18 * 1.0, 4)
+
+    def test_boundary_confidence_exactly_0(self):
+        gold = _make_gold()
+        action = _make_action(confidence=0.0)
+        _, scores, _ = grade(action, gold)
+        assert scores["calibration"] == 0.0
+
+    def test_boundary_confidence_exactly_1(self):
+        gold = _make_gold()
+        action = _make_action(confidence=1.0)
+        _, scores, _ = grade(action, gold)
+        assert scores["calibration"] == round(0.10 * 1.0, 4)
+
+    def test_reasoning_exactly_9_chars(self):
+        gold = _make_gold()
+        action = _make_action(reasoning="123456789")
+        _, scores, _ = grade(action, gold)
+        assert scores["reasoning"] == 0.0
+
+    def test_reasoning_exactly_10_chars(self):
+        gold = _make_gold()
+        action = _make_action(reasoning="1234567890")
+        _, scores, _ = grade(action, gold)
+        assert scores["reasoning"] == round(0.18 * 0.25, 4)
+
+    def test_reasoning_exactly_40_chars(self):
+        gold = _make_gold()
+        action = _make_action(reasoning="A" * 40)
+        _, scores, _ = grade(action, gold)
+        assert scores["reasoning"] == round(0.18 * 0.5, 4)
+
+    def test_all_components_sum_correct_with_platform(self):
+        """Component scores sum to total for platform-weighted grading."""
+        gold = _make_gold(platform="tiktok")
+        action = _make_action(reasoning="A" * 120)
+        total, scores, _ = grade(action, gold)
+        component_sum = (scores["decision"] + scores["category"] +
+                        scores["reasoning"] + scores["age_rating"] +
+                        scores["efficiency"] + scores["calibration"])
+        assert abs(total - component_sum) < 0.001
 
     def test_total_is_non_negative(self):
         gold = _make_gold(decision="REJECT")

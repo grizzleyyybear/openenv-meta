@@ -1,4 +1,4 @@
-"""Deterministic multi-signal reward grader."""
+"""Deterministic multi-signal reward grader with platform-aware scoring."""
 
 from typing import Any, Dict, List, Tuple
 
@@ -15,8 +15,68 @@ _RISK_ORDER = {"LOW": 0, "MEDIUM": 1, "HIGH": 2, "CRITICAL": 3}
 
 _AGE_ORDER = {"ALL_AGES": 0, "TEEN": 1, "MATURE": 2, "ADULT": 3}
 
-# Age adjacency: off-by-one is partial credit, off-by-two+ is zero
 _AGE_DISTANCE_SCORE = {0: 1.0, 1: 0.5, 2: 0.15, 3: 0.0}
+
+# Platform-specific weight profiles: each platform adjusts component emphasis.
+# TikTok/Instagram skew young → age_rating matters more
+# LinkedIn is professional → category/reasoning matters more
+# Reddit is community-moderated → decision/reasoning matters more
+# X/Threads are fast-moving → efficiency matters more
+_PLATFORM_WEIGHTS: Dict[str, Dict[str, float]] = {
+    "tiktok":    {"decision": 0.26, "category": 0.18, "reasoning": 0.16, "age_rating": 0.18, "efficiency": 0.10, "calibration": 0.12},
+    "instagram": {"decision": 0.27, "category": 0.19, "reasoning": 0.17, "age_rating": 0.16, "efficiency": 0.10, "calibration": 0.11},
+    "youtube":   {"decision": 0.28, "category": 0.20, "reasoning": 0.18, "age_rating": 0.14, "efficiency": 0.10, "calibration": 0.10},
+    "x":         {"decision": 0.30, "category": 0.18, "reasoning": 0.18, "age_rating": 0.10, "efficiency": 0.14, "calibration": 0.10},
+    "threads":   {"decision": 0.30, "category": 0.18, "reasoning": 0.18, "age_rating": 0.10, "efficiency": 0.14, "calibration": 0.10},
+    "reddit":    {"decision": 0.28, "category": 0.16, "reasoning": 0.22, "age_rating": 0.10, "efficiency": 0.12, "calibration": 0.12},
+    "linkedin":  {"decision": 0.26, "category": 0.22, "reasoning": 0.22, "age_rating": 0.10, "efficiency": 0.10, "calibration": 0.10},
+    "facebook":  {"decision": 0.28, "category": 0.20, "reasoning": 0.18, "age_rating": 0.14, "efficiency": 0.10, "calibration": 0.10},
+}
+_DEFAULT_WEIGHTS = {"decision": 0.30, "category": 0.20, "reasoning": 0.18, "age_rating": 0.12, "efficiency": 0.10, "calibration": 0.10}
+
+# Platform-specific adjacency overrides: some platforms are stricter
+# On young-skewing platforms, approving harmful content is worse
+_PLATFORM_APPROVE_PENALTY: Dict[str, float] = {
+    "tiktok": 0.8,     # approving harmful on TikTok is 80% worse
+    "instagram": 0.7,
+    "youtube": 0.5,
+}
+
+# Platform-specific age rating strictness: young-skewing platforms
+# penalize age under-rating more heavily
+_PLATFORM_AGE_STRICTNESS: Dict[str, float] = {
+    "tiktok": 1.5,     # 50% stricter on age under-rating
+    "instagram": 1.3,
+    "youtube": 1.2,
+    "linkedin": 0.8,   # less strict (professional audience)
+    "reddit": 0.7,     # community-moderated, more permissive
+}
+
+
+def _get_weights(platform: str) -> Dict[str, float]:
+    return _PLATFORM_WEIGHTS.get(platform.lower().strip(), _DEFAULT_WEIGHTS)
+
+
+def _safe_str(val: Any, default: str = "") -> str:
+    if val is None:
+        return default
+    return str(val).strip()
+
+
+def _safe_float(val: Any, default: float = 0.5, lo: float = 0.0, hi: float = 1.0) -> float:
+    try:
+        f = float(val)
+    except (TypeError, ValueError):
+        return default
+    return max(lo, min(hi, f))
+
+
+def _safe_int(val: Any, default: int = 1, lo: int = 1, hi: int = 3) -> int:
+    try:
+        i = int(val)
+    except (TypeError, ValueError):
+        return default
+    return max(lo, min(hi, i))
 
 
 def grade(
@@ -24,41 +84,50 @@ def grade(
     gold: Dict[str, Any],
     steps_taken: int = 1,
 ) -> Tuple[float, Dict[str, float], str]:
-    decision = action_data.get("decision", "")
-    iab_category = action_data.get("iab_category", "")
-    garm_category = action_data.get("garm_category", "")
-    risk_level = action_data.get("risk_level", "MEDIUM")
-    reasoning = action_data.get("reasoning", "")
-    confidence = max(0.0, min(1.0, float(action_data.get("confidence", 0.5))))
-    age_rating = action_data.get("age_rating", "TEEN")
+    # --- Extract and sanitize action fields ---
+    decision = _safe_str(action_data.get("decision"))
+    iab_category = _safe_str(action_data.get("iab_category"))
+    garm_category = _safe_str(action_data.get("garm_category"))
+    risk_level = _safe_str(action_data.get("risk_level"), "MEDIUM")
+    reasoning = _safe_str(action_data.get("reasoning"))
+    confidence = _safe_float(action_data.get("confidence"), 0.5)
+    age_rating = _safe_str(action_data.get("age_rating"), "TEEN")
     flagged_elements = action_data.get("flagged_elements", [])
     if not isinstance(flagged_elements, list):
         flagged_elements = []
 
-    gold_decision = gold["gold_decision"]
-    gold_iab = gold["gold_iab_category"]
-    gold_garm = gold["gold_garm_category"]
-    gold_risk = gold.get("gold_risk_level", "MEDIUM")
-    gold_age = gold.get("gold_age_rating", "TEEN")
-    difficulty = gold["difficulty"]
-    correct = decision == gold_decision
+    # --- Extract gold labels with safe defaults ---
+    gold_decision = _safe_str(gold.get("gold_decision"))
+    gold_iab = _safe_str(gold.get("gold_iab_category"))
+    gold_garm = _safe_str(gold.get("gold_garm_category"))
+    gold_risk = _safe_str(gold.get("gold_risk_level"), "MEDIUM")
+    gold_age = _safe_str(gold.get("gold_age_rating"), "TEEN")
+    difficulty = _safe_str(gold.get("difficulty"), "easy")
+    platform = _safe_str(gold.get("platform"), "")
+    steps_taken = _safe_int(steps_taken)
 
-    # Decision score (weight 0.30): exact match, adjacency, or miss
+    correct = decision == gold_decision
+    weights = _get_weights(platform)
+
+    # === Decision score ===
     if correct:
         decision_score = 1.0
     else:
         decision_score = _ADJACENCY.get((decision, gold_decision), 0.0)
+        # Platform penalty: approving harmful content on young platforms is worse
+        if decision == "APPROVE" and gold_decision == "REJECT":
+            penalty_mult = _PLATFORM_APPROVE_PENALTY.get(platform, 0.0)
+            decision_score *= (1.0 - penalty_mult)
 
-    # Category score (weight 0.20): IAB + GARM + risk proximity
+    # === Category score: IAB + GARM + risk proximity ===
     iab_score = 1.0 if iab_category == gold_iab else 0.0
     garm_score = 1.0 if garm_category == gold_garm else 0.0
     risk_dist = abs(_RISK_ORDER.get(risk_level, 1) - _RISK_ORDER.get(gold_risk, 1))
     risk_score = max(0.0, 1.0 - risk_dist * 0.35)
     category_score = 0.4 * iab_score + 0.4 * garm_score + 0.2 * risk_score
 
-    # Reasoning score (weight 0.18): length + flagged elements + specificity
-    reasoning_text = reasoning.strip()
-    reasoning_len = len(reasoning_text)
+    # === Reasoning score: length + flagged elements + specificity ===
+    reasoning_len = len(reasoning)
     if reasoning_len >= 120:
         length_score = 1.0
     elif reasoning_len >= 80:
@@ -75,57 +144,68 @@ def grade(
         flagging_bonus = min(0.3, len(flagged_elements) * 0.1)
 
     specificity_bonus = 0.0
-    if reasoning_len >= 10 and any(word in reasoning_text.lower() for word in
+    if reasoning_len >= 10 and any(word in reasoning.lower() for word in
             ["profanity", "hate", "misinformation", "violence", "drug", "gambling",
              "adult", "piracy", "terrorism", "scam", "mlm", "extremist", "satire",
-             "advocacy", "political", "brand-safe", "unsafe"]):
+             "advocacy", "political", "brand-safe", "unsafe", "age", "minor",
+             "young", "explicit", "threat", "illegal"]):
         specificity_bonus = 0.1
 
     reasoning_score = min(1.0, length_score + flagging_bonus + specificity_bonus)
 
-    # Age rating score (weight 0.12): exact or adjacent
+    # === Age rating score: exact or adjacent, platform-adjusted ===
     age_dist = abs(_AGE_ORDER.get(age_rating, 1) - _AGE_ORDER.get(gold_age, 1))
     age_rating_score = _AGE_DISTANCE_SCORE.get(age_dist, 0.0)
+    # Platform strictness: on young platforms, under-rating age is penalized more
+    strictness = _PLATFORM_AGE_STRICTNESS.get(platform, 1.0)
+    predicted_age_ord = _AGE_ORDER.get(age_rating, 1)
+    gold_age_ord = _AGE_ORDER.get(gold_age, 1)
+    if predicted_age_ord < gold_age_ord:
+        # Under-rated: said ALL_AGES when it should be TEEN/MATURE/ADULT
+        penalty = (1.0 - age_rating_score) * (strictness - 1.0)
+        age_rating_score = max(0.0, age_rating_score - penalty)
 
-    # Efficiency score (weight 0.10): step-efficiency multiplier
-    step_mult = _STEP_EFFICIENCY.get(min(max(steps_taken, 1), 3), 0.4)
+    # === Efficiency score ===
+    step_mult = _STEP_EFFICIENCY.get(steps_taken, 0.4)
     efficiency_score = step_mult
 
-    # Calibration score (weight 0.10): rewards well-calibrated confidence
+    # === Calibration score ===
     if correct:
         calibration_score = confidence
     else:
         calibration_score = 1.0 - confidence
         if confidence > 0.9:
-            calibration_score *= 0.5  # extra penalty for overconfident wrong answers
+            calibration_score *= 0.5
 
-    # Difficulty multiplier
+    # === Difficulty multiplier ===
     difficulty_multiplier = {"easy": 1.0, "medium": 1.05, "hard": 1.1}.get(difficulty, 1.0)
 
+    # === Weighted total ===
     raw_total = (
-        0.30 * decision_score
-        + 0.20 * category_score
-        + 0.18 * reasoning_score
-        + 0.12 * age_rating_score
-        + 0.10 * efficiency_score
-        + 0.10 * calibration_score
+        weights["decision"] * decision_score
+        + weights["category"] * category_score
+        + weights["reasoning"] * reasoning_score
+        + weights["age_rating"] * age_rating_score
+        + weights["efficiency"] * efficiency_score
+        + weights["calibration"] * calibration_score
     )
     total = min(1.0, max(0.0, raw_total * difficulty_multiplier))
 
     component_scores = {
-        "decision": round(0.30 * decision_score, 4),
-        "category": round(0.20 * category_score, 4),
-        "reasoning": round(0.18 * reasoning_score, 4),
-        "age_rating": round(0.12 * age_rating_score, 4),
-        "efficiency": round(0.10 * efficiency_score, 4),
-        "calibration": round(0.10 * calibration_score, 4),
+        "decision": round(weights["decision"] * decision_score, 4),
+        "category": round(weights["category"] * category_score, 4),
+        "reasoning": round(weights["reasoning"] * reasoning_score, 4),
+        "age_rating": round(weights["age_rating"] * age_rating_score, 4),
+        "efficiency": round(weights["efficiency"] * efficiency_score, 4),
+        "calibration": round(weights["calibration"] * calibration_score, 4),
         "total": round(total, 4),
     }
 
     feedback = _build_feedback(
         decision, gold_decision, iab_category, gold_iab,
         garm_category, gold_garm, risk_level, gold_risk,
-        age_rating, gold_age, component_scores, difficulty, steps_taken
+        age_rating, gold_age, component_scores, difficulty,
+        steps_taken, platform
     )
 
     return total, component_scores, feedback
@@ -140,6 +220,7 @@ def _build_feedback(
     scores: Dict[str, float],
     difficulty: str,
     steps_taken: int = 1,
+    platform: str = "",
 ) -> str:
     parts: List[str] = []
     if decision == gold_decision:
@@ -158,6 +239,7 @@ def _build_feedback(
     if age != gold_age:
         parts.append(f"Age rating '{age}' vs gold '{gold_age}'.")
 
+    platform_note = f" [{platform}]" if platform else ""
     step_note = f" ({steps_taken} step{'s' if steps_taken != 1 else ''})"
     parts.append(
         f"Scores: decision={scores['decision']:.2f} "
@@ -165,7 +247,7 @@ def _build_feedback(
         f"reasoning={scores['reasoning']:.2f} "
         f"age_rating={scores['age_rating']:.2f} "
         f"efficiency={scores['efficiency']:.2f} "
-        f"calibration={scores['calibration']:.2f} "
-        f"| total={scores['total']:.3f} [{difficulty}]{step_note}"
+        f"calibration={scores['calibration']:.02f} "
+        f"| total={scores['total']:.3f} [{difficulty}]{platform_note}{step_note}"
     )
     return " ".join(parts)
