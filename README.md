@@ -70,19 +70,36 @@ Each item has gold labels, context layers, and deterministic grading.
 ### Docker (recommended)
 
 ```bash
+git clone https://github.com/Tnmae/openenv-meta.git
+cd openenv-meta
 docker build -t ad-review-env .
 docker run -p 8000:8000 ad-review-env
 ```
 
-### Local
+### Local (pip)
 
 ```bash
-cd ad_review_env
-uv pip install -e "."
+git clone https://github.com/Tnmae/openenv-meta.git
+cd openenv-meta/ad_review_env
+pip install -e ".[inference]"
 uvicorn server.app:app --port 8000
 ```
 
-Then: [localhost:8000/web](http://localhost:8000/web) for the dashboard, [localhost:8000/docs](http://localhost:8000/docs) for API docs.
+### Local (uv)
+
+```bash
+git clone https://github.com/Tnmae/openenv-meta.git
+cd openenv-meta/ad_review_env
+uv pip install --system -e ".[inference]"
+uvicorn server.app:app --port 8000
+```
+
+**Requirements:** Python ≥ 3.10, pip or uv. Docker alternative needs only Docker.
+
+Once running, visit:
+- Dashboard: [localhost:8000/web](http://localhost:8000/web)
+- API docs: [localhost:8000/docs](http://localhost:8000/docs)
+- Health check: [localhost:8000/health](http://localhost:8000/health)
 
 ## API Endpoints
 
@@ -95,36 +112,78 @@ Then: [localhost:8000/web](http://localhost:8000/web) for the dashboard, [localh
 | `/tasks` | GET | Fetch content items for evaluation |
 | `/grader` | POST | Grade a decision against gold labels |
 | `/evaluate` | GET | Batch evaluation (smart or baseline agent) |
+| `/analyze` | POST | Classify arbitrary text with the smart agent |
 | `/baseline` | GET | Baseline agent demo |
 | `/web` | GET | Interactive dashboard |
 | `/schema` | GET | Action/observation JSON schemas |
 | `/docs` | GET | OpenAPI documentation |
 
-## Inference
+## Running Inference
+
+The inference script runs episodes using the standard `POST /reset` → `POST /step` loop.
+
+### Environment Variables
+
+| Variable | Required | Description | Default |
+|----------|----------|-------------|---------|
+| `API_BASE_URL` | Yes | OpenAI-compatible API endpoint | `https://router.huggingface.co/v1` |
+| `MODEL_NAME` | Yes | Model identifier (e.g. `qwen2.5-coder:7b`) | — |
+| `HF_TOKEN` or `API_KEY` | Yes | API authentication key | — |
+| `ENV_URL` | No | Environment server URL | `http://localhost:8000` |
+
+### With HuggingFace Router
 
 ```bash
 export API_BASE_URL="https://router.huggingface.co/v1"
-export MODEL_NAME="deepseek/deepseek-r1-0528"
-export HF_TOKEN="your-token"
-export ENV_URL="https://tnmae-openenv-ad-review.hf.space"
-
-pip install openai requests
+export MODEL_NAME="deepseek-ai/DeepSeek-R1"
+export HF_TOKEN="hf_your_token"
+export ENV_URL="http://localhost:8000"
 python inference.py
 ```
 
-The script runs episodes via the standard `POST /reset` → `POST /step` loop, calling the LLM for each decision.
+### With Local Ollama
+
+```bash
+# Install and run a model first: ollama pull qwen2.5-coder:7b
+export API_BASE_URL="http://localhost:11434/v1"
+export API_KEY="ollama"
+export MODEL_NAME="qwen2.5-coder:7b"
+export ENV_URL="http://localhost:8000"
+python inference.py
+```
+
+### With Any OpenAI-Compatible API
+
+```bash
+export API_BASE_URL="https://api.openai.com/v1"  # or any compatible endpoint
+export API_KEY="sk-your-key"
+export MODEL_NAME="gpt-4o"
+export ENV_URL="http://localhost:8000"
+python inference.py
+```
+
+### Windows (PowerShell)
+
+```powershell
+$env:API_BASE_URL = "http://localhost:11434/v1"
+$env:API_KEY = "ollama"
+$env:MODEL_NAME = "qwen2.5-coder:7b"
+$env:ENV_URL = "http://localhost:8000"
+python inference.py
+```
 
 ## Baseline Scores
 
 | Agent | Mean Score | Accuracy | Easy | Medium | Hard |
 |-------|-----------|----------|------|--------|------|
 | Keyword baseline | 0.52 | 53% | 0.55 | 0.49 | 0.51 |
-| Smart rule-based | 0.996 | 100% | 0.99 | 0.99 | 1.00 |
-| Qwen 2.5-coder 7B | 0.89 | 93% | 0.86 | 0.87 | 0.94 |
+| Smart rule-based | 0.983 | 100% | 0.96 | 0.99 | 1.00 |
+| Qwen 2.5-coder 7B | 0.847 | 76% | 0.91 | 0.85 | 0.78 |
 
 ## Tests
 
 ```bash
+pip install pytest
 python -m pytest tests/ -v
 ```
 
