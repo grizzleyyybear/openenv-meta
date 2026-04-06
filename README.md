@@ -12,7 +12,7 @@ pinned: false
 
 An OpenEnv RL environment for UGC content moderation. Agents classify posts using **IAB Content Taxonomy 3.0** and **GARM Brand Safety Floor** standards, deciding to approve, reject, or escalate. Multi-step episodes let agents request author history and community signals before deciding.
 
-**Live:** [tnmae-openenv-ad-review.hf.space](https://tnmae-openenv-ad-review.hf.space/web)
+**Live:** [https://huggingface.co/spaces/Tnmae/openenv-ad-review](https://huggingface.co/spaces/Tnmae/openenv-ad-review)
 
 ## How It Works
 
