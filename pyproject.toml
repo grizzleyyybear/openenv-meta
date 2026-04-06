@@ -22,9 +22,12 @@ dev = [
     "pytest-cov>=4.0.0",
 ]
 
+[project.scripts]
+server = "server.app:main"
+
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["ad_review_env*"]
+include = ["ad_review_env*", "server*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
