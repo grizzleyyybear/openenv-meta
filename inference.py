@@ -217,16 +217,17 @@ def call_llm(
                 ],
                 temperature=TEMPERATURE,
                 max_tokens=MAX_TOKENS,
+                stream=False,
             )
             parsed = extract_json(response.choices[0].message.content or "")
             if parsed is not None:
                 return validate_action(parsed)
-            log.warning("Attempt %d: failed to parse JSON from LLM response", attempt + 1)
+            print(f"[DEBUG] Attempt {attempt + 1}: failed to parse JSON from LLM response", flush=True)
             if attempt < retries - 1:
                 continue
             return FALLBACK_ACTION.copy()
         except Exception as e:
-            log.warning("Attempt %d: API error: %s", attempt + 1, e)
+            print(f"[DEBUG] Attempt {attempt + 1}: API error: {e}", flush=True)
             if attempt < retries - 1:
                 continue
             return FALLBACK_ACTION.copy()
