@@ -1,7 +1,10 @@
 """Inference script for Brand-Safe Ad Review.
 
-Required env vars: HF_TOKEN
-Optional env vars: API_BASE_URL, MODEL_NAME, ENV_URL
+Env vars:
+  HF_TOKEN      — required, no default (your Hugging Face API key)
+  API_BASE_URL  — optional, defaults to https://router.huggingface.co/v1
+  MODEL_NAME    — optional, defaults to meta-llama/Llama-3.3-70B-Instruct
+  ENV_URL       — optional, defaults to http://localhost:8000
 """
 
 import json
