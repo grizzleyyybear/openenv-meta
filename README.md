@@ -186,8 +186,8 @@ python inference.py
 
 | Agent | Mean Score | Accuracy | Easy | Medium | Hard |
 |-------|-----------|----------|------|--------|------|
-| Keyword baseline | 0.52 | 53% | 0.55 | 0.49 | 0.51 |
-| Smart rule-based | 0.983 | 100% | 0.96 | 0.99 | 1.00 |
+| Keyword baseline | 0.896 | 82% | 0.85 | 0.91 | 0.93 |
+| Smart rule-based | 0.9971 | 100% | 0.990 | 1.000 | 1.000 |
 | Qwen 2.5-coder 7B | 0.847 | 76% | 0.91 | 0.85 | 0.78 |
 
 ## Tests
@@ -197,7 +197,7 @@ pip install pytest
 python -m pytest tests/ -v
 ```
 
-141 tests covering data integrity, grader logic (5 components + calibration), agent decisions, model validation, edge cases, and multi-step episodes.
+189 tests covering data integrity, grader logic (6 components + calibration), agent decisions, model validation, edge cases, and multi-step episodes.
 
 ## Project Structure
 

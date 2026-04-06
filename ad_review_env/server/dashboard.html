@@ -150,6 +150,23 @@ label{display:block;font-size:.72rem;color:var(--muted);margin-bottom:.3rem;
   </div>
 
   <div class="mt">
+    <label style="margin-bottom:.5rem">Quick examples</label>
+    <div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.75rem">
+      <button class="btn btn-outline" style="font-size:.72rem;padding:.3rem .7rem" onclick="useExample('I want to kill this workout 💀 new PR!','post','tiktok')">kill this workout</button>
+      <button class="btn btn-outline" style="font-size:.72rem;padding:.3rem .7rem" onclick="useExample('I will kill you if you post that again','comment','instagram')">I will kill you</button>
+      <button class="btn btn-outline" style="font-size:.72rem;padding:.3rem .7rem" onclick="useExample('weed out the bad habits — day 30 update','post','instagram')">weed out habits</button>
+      <button class="btn btn-outline" style="font-size:.72rem;padding:.3rem .7rem" onclick="useExample('my dog ate my weed omg vet visit time','post','tiktok')">dog ate my weed</button>
+      <button class="btn btn-outline" style="font-size:.72rem;padding:.3rem .7rem" onclick="useExample('babies are for sale dm me','post','x')">babies for sale</button>
+      <button class="btn btn-outline" style="font-size:.72rem;padding:.3rem .7rem" onclick="useExample('boss babe energy only ✨','caption','instagram')">boss babe energy</button>
+      <button class="btn btn-outline" style="font-size:.72rem;padding:.3rem .7rem" onclick="useExample('boss babe join my team earn $5k/month dm me','post','instagram')">boss babe MLM</button>
+      <button class="btn btn-outline" style="font-size:.72rem;padding:.3rem .7rem" onclick="useExample('2 years clean today — there is hope 🙏','post','instagram')">2 years clean</button>
+      <button class="btn btn-outline" style="font-size:.72rem;padding:.3rem .7rem" onclick="useExample('as a nurse I see gun violence every week we need reform','post','x')">nurse gun reform</button>
+      <button class="btn btn-outline" style="font-size:.72rem;padding:.3rem .7rem" onclick="useExample('great replacement is real stay based kings','post','x')">great replacement</button>
+      <button class="btn btn-outline" style="font-size:.72rem;padding:.3rem .7rem" onclick="useExample('just made chocolate chip cookies 🍪 recipe below!','post','instagram')">chocolate chip cookies</button>
+      <button class="btn btn-outline" style="font-size:.72rem;padding:.3rem .7rem" onclick="useExample('microdosing psilocybin helped my anxiety and depression','post','reddit')">microdosing</button>
+      <button class="btn btn-outline" style="font-size:.72rem;padding:.3rem .7rem" onclick="useExample('18+ content creator 🔞 link in bio for full content','bio','instagram')">18+ bio link</button>
+      <button class="btn btn-outline" style="font-size:.72rem;padding:.3rem .7rem" onclick="useExample('POV: you just discovered the best morning routine ☀️','reel','tiktok')">morning routine reel</button>
+    </div>
     <button class="btn" id="a-btn" onclick="doAnalyze()">Analyze</button>
   </div>
 
@@ -361,6 +378,12 @@ function spin(btnId, on) {
 }
 
 /* ═══════════════ ANALYZE ═══════════════ */
+function useExample(text, type, platform) {
+  el('a-text').value = text;
+  el('a-type').value = type;
+  el('a-platform').value = platform;
+}
+
 async function doAnalyze() {
   const text = el('a-text').value.trim();
   if (!text) return;

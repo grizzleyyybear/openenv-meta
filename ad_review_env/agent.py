@@ -70,14 +70,20 @@ class Classification:
     reasoning_parts: List[str] = field(default_factory=list)
 
 CRITICAL_PATTERNS: List[WeightedPattern] = [
-    (r"\b(kill|murder|rape|shoot|stab)\s+(that|this|him|her|them|you|me|everyone|everybody|someone|somebody)\b", 0.9),
-    (r"\b(gonna|going\s+to|will|i'?ll|let'?s|want\s+to|need\s+to)\s+(kill|murder|shoot|stab|attack|hurt|rape)\b", 0.9),
-    (r"\b(eat|cook|hurt|harm|kill|abuse|hit|punch|kick|burn|torture|molest|sell|buy|traffic)\s+(the\s+|a\s+|an\s+)?(baby|babies|child|children|kid|kids|infant|toddler|minor|puppy|puppies|kitten|kittens)\b", 0.95),
+    (r"\b(kill|murder|rape|shoot|stab)\s+(that|him|her|them|you|me|everyone|everybody|someone|somebody)\b", 0.9),
+    (r"\bkill\s+this\s+(guy|person|man|woman|bitch|bastard|asshole|dude|kid|child)\b", 0.9),
+    (r"\b(gonna|going\s+to|will|i'?ll|let'?s|need\s+to)\s+(kill|murder|shoot|stab|attack|hurt|rape)\b(?!.*(workout|presentation|game|stage|it|this\s|interview|audition|test|exam|meeting))", 0.9),
+    (r"\bwant\s+to\s+kill\b(?!.*(workout|presentation|game|stage|it\b|interview|audition|this\s))", 0.9),
+    (r"\b(eat|cook|hurt|harm|kill|abuse|hit|punch|kick|burn|torture|molest|sell|buy|traffic)\s+(the\s+|a\s+|an\s+)(baby|babies|child|children|kid|kids|infant|toddler|minor|puppy|puppies|kitten|kittens)\b", 0.95),
+    (r"\b(molest|abuse|harm|hurt|torture)\s+(baby|babies|child|children|kid|kids|infant|toddler|minor)\b", 0.95),
     (r"\b(baby|babies|child|children|kid|kids|infant)\s+(eat|cook|burn|torture|abuse|kill|murder)\b", 0.95),
     (r"\b(baby|babies|child|children|kid|kids|infant|minor|girl|boy)\w*\s+(are\s+|is\s+)?(for\s+sale|for\s+sell|to\s+sell|to\s+buy|available|on\s+sale)\b", 0.95),
     (r"\b(sell|buy|trade|traffic)\w*\s+(the\s+|a\s+|an\s+|some\s+|my\s+|your\s+|our\s+|his\s+|her\s+|their\s+)?(baby|babies|child|children|kid|kids|infant|minor|girl|boy)\b", 0.95),
+    (r"(?!.*\b(adopt\w*|married|marriage|custody|divorce|wed\w*|foster)\b)\b(have|get|obtain|acquire|take|want)\s+(baby|babies|child|children|kid|kids|infant|minor\w*)\s+\w*\s*(not\s+legal\w*|illegally|without\s+(consent|permission|authorization)|underage|unlawfully)\b", 0.95),
+    (r"(?!.*\b(adopt\w*|married|marriage|custody|divorce|wed\w*|foster)\b)\b(baby|babies|child|children|kid|kids|infant|minor\w*)\b.{0,60}(not\s+legal\w*|illegally|against\s+the\s+law|unlawfully)\b", 0.9),
+    (r"(?!.*\b(adopt\w*|married|marriage|custody|divorce|wed\w*|foster)\b)\b(not\s+legal\w*|illegally|against\s+the\s+law|unlawfully)\b.{0,60}\b(baby|babies|child|children|kid|kids|infant|minor\w*)\b", 0.9),
     (r"\b(eat|cook|consume)\s+(the\s+|a\s+|an\s+)?(human|humans|person|people|body|flesh|corpse)\b", 0.9),
-    (r"\b(kill|murder|rape)\b", 0.6),
+    (r"\b(kill|murder|rape)\b(?!.*(workout|presentation|game|stage|it\b|the\s+game|the\s+stage|my\s+workout|this\s+workout|it\s+at|killing\s+it|bug|code|lol|this\s+bug|the\s+vibe|the\s+beat|the\s+set|the\s+show))", 0.6),
     (r"\bterrorist\b", 0.9),
     (r"\bbomb\b(?!.*(bath|cherry|caramel))", 0.9),
     (r"\bchild\s*porn", 1.0),
@@ -95,7 +101,9 @@ ADULT_PATTERNS: List[WeightedPattern] = [
     (r"18\+\s*only", 0.9),
     (r"\b(uncensored|explicit)\b.*\bcontent\b", 0.85),
     (r"🔞", 0.9),
-    (r"\badult\s*content\b", 0.9),
+    (r"\badult\s*content\b.*\b(subscribe|link|page|onlyfans|fansly|only\s*fans|sub4sub|click)\b", 0.9),
+    (r"\b(creator|subscribe|link|page|onlyfans|fansly)\b.*\badult\s*content\b", 0.9),
+    (r"\badult\s*content\s*(creator|maker)\b.*\b(18\+|link|sub|only\s*fans)\b", 0.85),
     (r"\bnude|naked|xxx\b", 0.85),
     (r"\bnew videos daily\b.*😈", 0.7),
     (r"\b(onlyfans|fansly|manyvids)\b", 0.85),
@@ -111,10 +119,12 @@ VIOLENCE_PATTERNS: List[WeightedPattern] = [
     (r"\bcompilation\b.*\b(fight|knockout|kill)", 0.8),
     (r"\bstreet\s*fight\b", 0.7),
     (r"💀.*\b(knockout|fight|brutal)\b", 0.6),
-    (r"\b(kill|shoot|stab|attack|hurt|assault|beat)\s+(that|this|him|her|them|you|me|everyone)\b", 0.85),
+    (r"\b(kill|shoot|stab|attack|hurt|assault|beat)\s+(that|him|her|them|you|me|everyone)\b", 0.85),
+    (r"\bkill\s+this\s+(guy|person|man|woman|bitch|dude|kid|child|asshole|bastard)\b", 0.85),
     (r"\bdeath\s*threat\b", 0.9),
     (r"\bthreat(en|s|ening)\b", 0.5),
-    (r"\b(eat|cook|burn|torture|dismember|skin)\s+(the\s+|a\s+|an\s+)?(baby|babies|child|children|kid|kids|person|people|dog|dogs|cat|cats|puppy|puppies|kitten|kittens|human|humans)\b", 0.9),
+    (r"\b(eat|cook|burn|torture|dismember|skin)\s+(the\s+|a\s+|an\s+)(baby|babies|child|children|kid|kids|person|people|dog|dogs|cat|cats|puppy|puppies|kitten|kittens|human|humans)\b", 0.9),
+    (r"\b(torture|dismember|skin|mutilate)\s+(baby|babies|child|children|kid|kids|person|people)\b", 0.9),
     (r"\b(baby|babies|child|children|kid|kids|person|people|dog|dogs|cat|cats)\s+(eat|cook|burn|torture)\b", 0.9),
     (r"\b(gore|dismember|mutilat|disembowel|behead)\b", 0.85),
     (r"\b(die|burn)\s+in\s+a\s+fire\b", 0.8),
@@ -181,7 +191,7 @@ MISINFORMATION_PATTERNS: List[WeightedPattern] = [
     (r"\btransformation\b.*\b(DM|supplement|coach)\b", 0.8),
     (r"\b(supplement\s*stack|coaching\s*plan)\b.*\bDM\b", 0.8),
     (r"\bDM\s*(me\s*)?(for|about)\b.*\b(supplement|coach|plan|stack)\b", 0.8),
-    (r"\b(boss\s*babe|CEO\s*of\s*my\s*own\s*destiny)\b", 0.85),
+    (r"\b(boss\s*babe|CEO\s*of\s*my\s*own\s*destiny)\b.*\b(earn|join|team|\$\d+|income|passive)\b", 0.85),
     (r"\b(earn|make)\s*\$?\d+K?\s*/\s*(month|week|day)\b", 0.8),
     (r"\bjoin\s*my\s*team\b", 0.8),
 ]
@@ -197,6 +207,7 @@ PROFANITY_PATTERNS: List[WeightedPattern] = [
 DRUGS_PATTERNS: List[WeightedPattern] = [
     (r"\bpsilocybin\b", 0.7),
     (r"\bmicrodosing?\b", 0.7),
+    (r"\b(weed|marijuana|cannabis|pot)\b(?!\s*(out\b|killer\b|garden\b|lawn\b|spray\b))", 0.5),
     (r"\b(weed|marijuana|cannabis)\b.*\b(buy|sell|ship)\b", 0.8),
     (r"🍄.*\b(anxiety|depression|mental)\b", 0.5),
     (r"\bCBD\b", 0.5),
@@ -224,6 +235,9 @@ GAMBLING_PATTERNS: List[WeightedPattern] = [
 CONTROVERSIAL_PATTERNS: List[WeightedPattern] = [
     (r"\babortion\b.*\b(illegal|ban)\b", 0.8),
     (r"\bgun\s*control\b", 0.6),
+    (r"\bgun\s*violence\b", 0.55),
+    (r"\b(gun|firearm|weapon)\s*(reform|regulation|ban|laws?)\b", 0.6),
+    (r"\b(nurse|doctor|teacher|firefighter|soldier|cop|police)\b.*\b(gun|weapon|violence|reform)\b", 0.6),
     (r"\bdestroying\s*democracy\b", 0.7),
     (r"\bfight\s*me\s*in\s*the\s*comments\b", 0.5),
     (r"\bthis\s*politician\b", 0.5),
@@ -421,7 +435,7 @@ def _classify_severe_misinfo(text: str, c: Classification) -> Classification:
         return _set(c, "REJECT", "IAB_MISINFORMATION", "GARM_SPAM_HARMFUL", "CRITICAL", 0.9,
                     "Dangerous medical misinformation: promoting unproven alternatives to standard treatment", "TEEN")
     if _text_matches(text, r"\bjoin\s*my\s*team\b") or \
-       _text_matches(text, r"\b(boss\s*babe|CEO\s*of\s*my\s*own)\b") or \
+       _text_matches(text, r"\b(boss\s*babe|CEO\s*of\s*my\s*own)\b.*\b(earn|join|team|\$\d+|income)\b") or \
        _text_matches(text, r"\b(earn|make)\s*\$?\d+K?\s*/\s*(month|week|day)\b"):
         return _set(c, "REJECT", "IAB_MISINFORMATION", "GARM_SPAM_HARMFUL", "HIGH", 0.82,
                     "MLM / predatory marketing: income claims and recruitment pattern detected", "TEEN")
@@ -444,10 +458,11 @@ def _classify_drugs(text: str, ctx: ContentContext, c: Classification) -> Classi
     is_cbd = _text_matches(text, r"\bCBD\b")
     has_health_framing = _text_matches(text, r"\b(helped|anxiety|depression|mental\s*health|sleep|saved|transformation|weight\s*loss)\b")
     has_redemption = _text_matches(text, r"\b(redemption|can\s*change|legit|years?\s*clean)\b")
+    is_accidental = _text_matches(text, r"\b(dog|cat|pet|kid|child|baby|accidentally|ate|eaten|ingested)\b")
     if is_cbd:
         return _set(c, "ESCALATE", "IAB_DRUGS", "GARM_SAFE", "MEDIUM", 0.6,
                     "CBD/hemp product discussion — legal but brand-dependent sensitivity, needs review", "TEEN")
-    if ctx.is_personal_narrative or has_health_framing or has_redemption:
+    if ctx.is_personal_narrative or has_health_framing or has_redemption or is_accidental:
         return _set(c, "ESCALATE", "IAB_DRUGS", "GARM_CRIME_HARMFUL", "MEDIUM", 0.65,
                     "Substance discussion in personal health/redemption context — needs human review", "TEEN")
     return _set(c, "REJECT", "IAB_DRUGS", "GARM_CRIME_HARMFUL", "HIGH", 0.8,
