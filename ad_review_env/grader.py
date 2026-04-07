@@ -71,10 +71,28 @@ def _safe_int(val: Any, default: int = 1, lo: int = 1, hi: int = 3) -> int:
 
 
 def grade(
-    action_data: Dict[str, Any],
-    gold: Dict[str, Any],
+    action_data: Any = None,
+    gold: Any = None,
     steps_taken: int = 1,
+    **kwargs,
 ) -> Tuple[float, Dict[str, float], str]:
+    # Robust entry-point: handle unexpected call signatures from validators
+    if action_data is None:
+        action_data = kwargs
+    if not isinstance(action_data, dict):
+        try:
+            import json
+            action_data = json.loads(str(action_data))
+        except Exception:
+            action_data = {}
+    if gold is None:
+        gold = {}
+    if not isinstance(gold, dict):
+        try:
+            import json
+            gold = json.loads(str(gold))
+        except Exception:
+            gold = {}
     decision = _safe_str(action_data.get("decision"))
     iab_category = _safe_str(action_data.get("iab_category"))
     garm_category = _safe_str(action_data.get("garm_category"))

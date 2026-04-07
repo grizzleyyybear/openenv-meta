@@ -17,46 +17,40 @@ tasks:
     difficulty: easy
     count: 8
     grader:
-      type: llm
+      type: code
       module: grader:grade
-      prompt_template: "Score the moderation decision strictly between 0 and 1 (exclusive) based on accuracy of decision, category classification, and reasoning quality."
   - id: harmful_content
     description: "Clearly harmful content — hate speech, explicit threats, CSAM signals, graphic violence. Agent must REJECT."
     difficulty: easy
     count: 7
     grader:
-      type: llm
+      type: code
       module: grader:grade
-      prompt_template: "Score the moderation decision strictly between 0 and 1 (exclusive) based on accuracy of decision, category classification, and reasoning quality."
   - id: contextual_moderation
     description: "Alcohol, gambling references, political commentary, health claims requiring context. Agent decides APPROVE/ESCALATE/REJECT."
     difficulty: medium
     count: 10
     grader:
-      type: llm
+      type: code
       module: grader:grade
-      prompt_template: "Score the moderation decision strictly between 0 and 1 (exclusive) based on accuracy of decision, category classification, and reasoning quality."
   - id: platform_sensitive
     description: "Content acceptable on some platforms (Reddit/X) but not others (TikTok/LinkedIn). Platform-aware moderation."
     difficulty: medium
     count: 8
     grader:
-      type: llm
+      type: code
       module: grader:grade
-      prompt_template: "Score the moderation decision strictly between 0 and 1 (exclusive) based on accuracy of decision, category classification, and reasoning quality."
   - id: coded_language
     description: "Coded extremist language, dog whistles, MLM recruitment, subtle misinformation without obvious keywords."
     difficulty: hard
     count: 9
     grader:
-      type: llm
+      type: code
       module: grader:grade
-      prompt_template: "Score the moderation decision strictly between 0 and 1 (exclusive) based on accuracy of decision, category classification, and reasoning quality."
   - id: edge_cases
     description: "Satire, recovery narratives, professional advocacy, figurative language — highest nuance required."
     difficulty: hard
     count: 8
     grader:
-      type: llm
+      type: code
       module: grader:grade
-      prompt_template: "Score the moderation decision strictly between 0 and 1 (exclusive) based on accuracy of decision, category classification, and reasoning quality."
