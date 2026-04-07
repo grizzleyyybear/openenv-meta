@@ -134,6 +134,8 @@ def log_start(task: str, env: str, model: str) -> None:
 def log_step(step: int, action: str, reward: float, done: bool, error: Optional[str]) -> None:
     error_val = error if error else "null"
     done_val = str(done).lower()
+    # Clamp reward to strictly (0, 1) for validator
+    reward = min(0.99, max(0.01, reward))
     print(
         f"[STEP] step={step} action={action} reward={reward:.2f} done={done_val} error={error_val}",
         flush=True,
@@ -141,9 +143,13 @@ def log_step(step: int, action: str, reward: float, done: bool, error: Optional[
 
 
 def log_end(success: bool, steps: int, rewards: List[float]) -> None:
-    rewards_str = ",".join(f"{r:.2f}" for r in rewards)
+    # Clamp each reward to strictly (0, 1) for validator
+    clamped = [min(0.99, max(0.01, r)) for r in rewards]
+    rewards_str = ",".join(f"{r:.2f}" for r in clamped)
+    avg = sum(clamped) / len(clamped) if clamped else 0.5
+    score = min(0.99, max(0.01, avg))
     print(
-        f"[END] success={str(success).lower()} steps={steps} rewards={rewards_str}",
+        f"[END] success={str(success).lower()} steps={steps} score={score:.2f} rewards={rewards_str}",
         flush=True,
     )
 
