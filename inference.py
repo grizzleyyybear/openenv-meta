@@ -23,7 +23,8 @@ HF_TOKEN = os.getenv("HF_TOKEN")
 LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")
 ENV_URL = os.getenv("ENV_URL", "http://localhost:8000")
 
-TASK_IDS = ["easy", "medium", "hard"]
+TASK_IDS = ["safe_content", "harmful_content", "contextual_moderation",
+            "platform_sensitive", "coded_language", "edge_cases"]
 BENCHMARK = "ad_review_env"
 TEMPERATURE = 0.0
 MAX_TOKENS = 512
@@ -142,14 +143,14 @@ def log_step(step: int, action: str, reward: float, done: bool, error: Optional[
     )
 
 
-def log_end(success: bool, steps: int, rewards: List[float]) -> None:
+def log_end(task: str, success: bool, steps: int, rewards: List[float]) -> None:
     # Clamp each reward to strictly (0, 1) for validator
     clamped = [min(0.99, max(0.01, r)) for r in rewards]
     rewards_str = ",".join(f"{r:.2f}" for r in clamped)
     avg = sum(clamped) / len(clamped) if clamped else 0.5
     score = min(0.99, max(0.01, avg))
     print(
-        f"[END] success={str(success).lower()} steps={steps} score={score:.2f} rewards={rewards_str}",
+        f"[END] task={task} success={str(success).lower()} steps={steps} score={score:.2f} rewards={rewards_str}",
         flush=True,
     )
 
@@ -332,80 +333,67 @@ def run_evaluation(client: OpenAI, env_url: str) -> Dict[str, Any]:
     except Exception:
         pass  # Continue anyway — /reset is what matters
 
-    scores_by_difficulty: Dict[str, List[float]] = {"easy": [], "medium": [], "hard": []}
     all_scores: List[float] = []
     results: List[Dict[str, Any]] = []
 
+    # Each task_id matches an id in openenv.yaml exactly
     for task_id in TASK_IDS:
-        try:
-            resp = requests.get(f"{env_url}/tasks", params={"n": 50, "difficulty": task_id, "seed": 42}, timeout=30)
-            resp.raise_for_status()
-            n_tasks = resp.json()["count"]
-        except Exception:
-            n_tasks = 3  # Fallback: run 3 episodes per difficulty
-        
-        if n_tasks == 0:
-            continue
+        # Run 3 episodes per task (validator needs at least 1 per task)
+        n_episodes = 3
 
         log_start(task_id, BENCHMARK, MODEL_NAME)
 
         task_scores: List[float] = []
         total_steps = 0
 
-        for i in range(1, n_tasks + 1):
+        for i in range(1, n_episodes + 1):
             try:
                 episode = run_episode(client, env_url, episode_num=i)
             except Exception as ep_err:
                 print(f"[DEBUG] Episode {i} failed: {ep_err}", flush=True)
                 log_step(i, "ESCALATE", 0.5, True, str(ep_err))
-                episode = {"content_id": "unknown", "difficulty": task_id, "decision": "ESCALATE",
+                episode = {"content_id": "unknown", "difficulty": "medium", "decision": "ESCALATE",
                            "gold_decision": "", "reward": 0.5, "steps": 1}
             score = episode["reward"]
-            diff = episode["difficulty"]
             all_scores.append(score)
             task_scores.append(score)
-            scores_by_difficulty[diff].append(score)
             total_steps += episode["steps"]
 
             results.append({
                 "content_id": episode["content_id"],
-                "difficulty": diff,
+                "difficulty": episode["difficulty"],
                 "decision": episode["decision"],
                 "gold_decision": episode["gold_decision"],
                 "score": score,
             })
 
         task_success = statistics.mean(task_scores) >= SUCCESS_SCORE_THRESHOLD if task_scores else False
-        log_end(task_success, total_steps, task_scores)
+        log_end(task_id, task_success, total_steps, task_scores)
 
-    return {"results": results, "all_scores": all_scores, "scores_by_difficulty": scores_by_difficulty}
+    return {"results": results, "all_scores": all_scores}
 
 
 def print_report(eval_data: Dict[str, Any]) -> None:
     scores = eval_data["all_scores"]
-    by_diff = eval_data["scores_by_difficulty"]
     results = eval_data["results"]
     correct = sum(1 for r in results if r["decision"] == r["gold_decision"])
     total = len(results)
 
     print(f"\n{'='*60}")
     print(f"  Model:     {MODEL_NAME}")
-    print(f"  Correct:   {correct}/{total} ({100*correct/total:.1f}%)")
-    print(f"  Mean:      {statistics.mean(scores):.4f}")
-    for diff in ["easy", "medium", "hard"]:
-        ds = by_diff.get(diff, [])
-        if ds:
-            dc = sum(1 for r in results if r["difficulty"] == diff and r["decision"] == r["gold_decision"])
-            print(f"  {diff:6s}:   mean={statistics.mean(ds):.4f}  correct={dc}/{len(ds)}")
+    print(f"  Correct:   {correct}/{total} ({100*correct/total:.1f}%)" if total else "  No results")
+    if scores:
+        print(f"  Mean:      {statistics.mean(scores):.4f}")
     print(f"{'='*60}")
 
 
 def main():
     if not HF_TOKEN:
         print("[DEBUG] HF_TOKEN not set, exiting gracefully", flush=True)
-        log_start("ad_review", BENCHMARK, MODEL_NAME)
-        log_step(1, "ESCALATE", 0.5, True, "HF_TOKEN not set")
-        log_end(False, 1, [0.5])
+        for tid in TASK_IDS:
+            log_start(tid, BENCHMARK, MODEL_NAME)
+            log_step(1, "ESCALATE", 0.5, True, "HF_TOKEN not set")
+            log_end(tid, False, 1, [0.5])
         return
 
     client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
@@ -415,10 +403,10 @@ def main():
         print_report(eval_data)
     except Exception as e:
         print(f"[DEBUG] Evaluation error: {e}", flush=True)
-        # Ensure we always output valid structured logs even on failure
-        log_start("ad_review", BENCHMARK, MODEL_NAME)
-        log_step(1, "ESCALATE", 0.5, True, str(e))
-        log_end(False, 1, [0.5])
+        for tid in TASK_IDS:
+            log_start(tid, BENCHMARK, MODEL_NAME)
+            log_step(1, "ESCALATE", 0.5, True, str(e))
+            log_end(tid, False, 1, [0.5])
 
 
 if __name__ == "__main__":
